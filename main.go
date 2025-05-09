@@ -28,7 +28,7 @@ var (
 	)
 	onCall       = flag.Bool("oncall", false, "Am I oncall for work?")
 	dayOverride  = flag.String("dayOverride", "", "Manually set day for testing.")
-	dateOverride = flag.String("dateOverride", "", "Manyually set date for testing.")
+	dateOverride = flag.String("dateOverride", "", "Manually set date for testing.")
 	defaultTags  = []string{
 		"NoBackseating",
 	}
@@ -172,8 +172,8 @@ func removeDuplicateStr(strSlice []string) []string {
 
 func mergeConfigs(o config, n config) config {
 	// Merge StreamTags
-	// This should only apply to globalConfig and gameConfig. All other configs
-	// will skip the merge if a file is not found.
+	// This check should only apply to globalConfig and gameConfig. All other
+	// configs will skip the merge if a file is not found.
 	// If we didn't find a file to load then include the defaultTags in the list.
 	if n.GameFound {
 		o.StreamTags = removeDuplicateStr(
