@@ -405,6 +405,8 @@ func main() {
 	// Included/Nested configs will be recursed during each merge.
 	slog.Debug("Merging configs...")
 	twitchConfigs := newConfig()
+	// Start with the defaultVTuberSoftware.
+	twitchConfigs.VTuberSoftware = defaultVTuberSoftware
 	// global
 	slog.Debug("  Global configs...")
 	twitchConfigs = mergeConfigs(twitchConfigs, globalConfig)
