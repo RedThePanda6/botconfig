@@ -162,9 +162,9 @@ func removeDuplicateStr(strSlice []string) []string {
 		// Remove spaces otherwise Twitch will reject.
 		item := strings.ReplaceAll(item, " ", "")
 
-		if _, value := allKeys[item]; !value {
-			allKeys[item] = true
+		if !allKeys[item] {
 			list = append(list, item)
+			allKeys[item] = true
 		}
 	}
 	return list
