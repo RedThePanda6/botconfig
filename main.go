@@ -30,6 +30,7 @@ var (
 	dayOverride  = flag.String("dayOverride", "", "Manually set day for testing.")
 	dateOverride = flag.String("dateOverride", "", "Manually set date for testing.")
 	defaultTags  = []string{
+		"FirstPlaythrough",
 		"NoBackseating",
 	}
 	// Default costs of LP.
@@ -172,18 +173,9 @@ func removeDuplicateStr(strSlice []string) []string {
 
 func mergeConfigs(o config, n config) config {
 	// Merge StreamTags
-	// This check should only apply to globalConfig and gameConfig. All other
-	// configs will skip the merge if a file is not found.
-	// If we didn't find a file to load then include the defaultTags in the list.
-	if n.GameFound {
-		o.StreamTags = removeDuplicateStr(
-			append(o.StreamTags, n.StreamTags...),
-		)
-	} else {
-		o.StreamTags = removeDuplicateStr(
-			append(o.StreamTags, defaultTags...),
-		)
-	}
+	o.StreamTags = removeDuplicateStr(
+		append(o.StreamTags, n.StreamTags...),
+	)
 
 	if n.VTuberSoftware != "" {
 		if validVTuberSoftware[n.VTuberSoftware] {
@@ -406,17 +398,30 @@ func main() {
 	twitchConfigs := newConfig()
 	// Start with the defaultVTuberSoftware.
 	twitchConfigs.VTuberSoftware = defaultVTuberSoftware
+
 	// global
-	slog.Debug("  Global configs...")
-	twitchConfigs = mergeConfigs(twitchConfigs, globalConfig)
+	if globalConfig.GameFound {
+		slog.Debug("  Global configs...")
+		twitchConfigs = mergeConfigs(twitchConfigs, globalConfig)
+	}
+
 	// game
-	slog.Debug("  Game configs...")
-	twitchConfigs = mergeConfigs(twitchConfigs, gameConfig)
+	if gameConfig.GameFound {
+		slog.Debug("  Game configs...")
+		twitchConfigs = mergeConfigs(twitchConfigs, gameConfig)
+	} else {
+		// If we don't find the game file then add teh defaultTags.
+		twitchConfigs.StreamTags = removeDuplicateStr(
+			append(twitchConfigs.StreamTags, defaultTags...),
+		)
+	}
+
 	// day
 	if dayConfig.GameFound {
 		slog.Debug("  Day configs...")
 		twitchConfigs = mergeConfigs(twitchConfigs, dayConfig)
 	}
+
 	// date
 	if dateConfig.GameFound {
 		slog.Debug("  Date configs...")
