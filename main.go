@@ -215,8 +215,7 @@ func mergeConfigs(o config, n config) config {
 	r := reflect.ValueOf(o)
 
 	for i := range r.NumField() {
-		field := r.Field(i)
-		if field.Kind() == reflect.Bool {
+		if r.Field(i).Kind() == reflect.Bool {
 			boolsToResolve = append(boolsToResolve, r.Type().Field(i).Name)
 		}
 	}
