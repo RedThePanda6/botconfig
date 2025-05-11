@@ -26,26 +26,13 @@ var (
 		"D:\\Temp\\config.json",
 		"The output file we write merged configs to.",
 	)
-	onCall       = flag.Bool("oncall", false, "Am I oncall for work?")
 	dayOverride  = flag.String("dayOverride", "", "Manually set day for testing.")
 	dateOverride = flag.String("dateOverride", "", "Manually set date for testing.")
-	defaultTags  = []string{
-		"FirstPlaythrough",
-		"NoBackseating",
-	}
-	// Default costs of LP.
-	defaultLPTalkingCost = int(250)
-	defaultLPGameCost    = defaultLPTalkingCost * 2
+	// Default tags to apply if no game configuration is found.
+	defaultTags  = []string{}
 	// A list of all include files read by filename to avoid processing duplicates.
 	// Mostly as a cheap backstop to prevent a recursive loop of includes.
 	includesSeen        = map[string]bool{}
-	validVTuberSoftware = map[string]bool{
-		"None":      true,
-		"Veadotube": true,
-		"VNyan":     true,
-		"VTS":       true,
-	}
-	defaultVTuberSoftware = "VNyan"
 )
 
 type config struct {
@@ -54,58 +41,16 @@ type config struct {
 	// Stream Settings
 	StreamTags     []string `json:"streamtags"`
 	TitleSuffix    string   `json:"titlesuffix"`
-	VTuberSoftware string   `json:"vtubersoftware"`
-	// Model Options
-	VNyanOutfit string `json:"vnyanoutfit"`
-	// Overlays
-	DeathCounter  bool   `json:"deathcounter"`
-	DeskCam       bool   `json:"deskcam"`
-	GamePad       bool   `json:"gamepad"`
-	OrpaxMemorial bool   `json:"orpaxmemorial"`
-	PandaSign     string `json:"pandasign"`
-	Uptime        bool   `json:"uptime"`
-	// Other Functions
-	OutfitPoll   bool `json:"outfitpoll"`
-	SongRequests bool `json:"songrequests"`
-	// Rewards
-	BedTime       bool `json:"bedtime"`
-	ChosenOne     bool `json:"chosenone"`
-	CreepyTime    bool `json:"creepytime"`
-	LPGameCost    int  `json:"lpgamecost"`
-	LPTalkingCost int  `json:"lptalkingcost"`
-	NameAThing    bool `json:"nameathing"`
-	NoBeanie      bool `json:"nobeanie"`
-	NoGlasses     bool `json:"noglasses"`
-	RaidRoulette  bool `json:"raidroulette"`
-	// Commands
-	// Bot Functions
-	Modlist        bool `json:"modlist"`
-	NotifyInterval int  `json:"notifyinterval"`
 	// Control
-	// Note that GameFound serves the dual purpose to communicate to StreamerBot
-	// if we have a config for the game as well as to signal if we've found a
-	// config file here so we don't need to merge "empty" configs.
-	EndHour       int    `json:"endhour"`
 	GameFound     bool   `json:"gamefound"`
 	GameName      string `json:"gamename"`
-	OnCall        bool   `json:"oncall"`
-	PauseableGame bool   `json:"pauseablegame"`
-	YTGameInTitle bool   `json:"ytgameintitle"`
 }
 
 func newConfig() config {
 	// For setting non-standard default values.
 	return config{
-		ChosenOne:      true,
-		LPGameCost:     defaultLPGameCost,
-		LPTalkingCost:  defaultLPTalkingCost,
-		NoGlasses:      true,
-		NotifyInterval: 5,
-		OutfitPoll:     true,
-		PandaSign:      "default",
-		PauseableGame:  true,
-		RaidRoulette:   true,
-		YTGameInTitle:  true,
+		// Especially any booleans that default to true.
+		// Or strings that should have a dafault value.
 	}
 }
 
@@ -177,28 +122,8 @@ func mergeConfigs(o config, n config) config {
 		append(o.StreamTags, n.StreamTags...),
 	)
 
-	if n.VTuberSoftware != "" {
-		if validVTuberSoftware[n.VTuberSoftware] {
-			o.VTuberSoftware = n.VTuberSoftware
-		} else {
-			slog.Debug("Invalid VTuberSoftware found: " + n.VTuberSoftware)
-		}
-	}
-
 	if n.TitleSuffix != "" {
 		o.TitleSuffix = n.TitleSuffix
-	}
-
-	if n.NotifyInterval < o.NotifyInterval {
-		o.NotifyInterval = n.NotifyInterval
-	}
-
-	if n.PandaSign != "default" {
-		o.PandaSign = n.PandaSign
-	}
-
-	if n.EndHour != 0 {
-		o.EndHour = n.EndHour
 	}
 
 	// Pull all bools from config struct to resolve them.
@@ -216,22 +141,6 @@ func mergeConfigs(o config, n config) config {
 		reflect.ValueOf(&o).Elem().FieldByName(f).SetBool(
 			resolveBool(o, n, f),
 		)
-	}
-
-	// Outfit conflict resolution.
-	if n.VNyanOutfit != "" {
-		o.VNyanOutfit = n.VNyanOutfit
-	}
-
-	// LP Cost overrides.
-	// In Game Cost
-	if n.LPGameCost != defaultLPGameCost {
-		o.LPGameCost = n.LPGameCost
-	}
-
-	// Talking Scene Cost
-	if n.LPTalkingCost != defaultLPTalkingCost {
-		o.LPTalkingCost = n.LPTalkingCost
 	}
 
 	// Keep include processing last!
@@ -257,78 +166,12 @@ func applyOverrides(c config) config {
 	// Values that don't need to be passed into StreamerBot.
 	c.Include = ""
 
-	// Sanity check the VTuber Software set.
-	if !validVTuberSoftware[c.VTuberSoftware] {
-		slog.Debug("Invalid VTuberSoftware set. Using default: " + defaultVTuberSoftware + ".")
-		c.VTuberSoftware = defaultVTuberSoftware
-	}
-
-	// Apply overrides based on VTuberSoftware.
-	switch c.VTuberSoftware {
-	// PNGTuber Settings
-	case "Veadotube":
-		c.StreamTags = removeDuplicateStr(
-			append([]string{"VTuber", "RedPanda"}, c.StreamTags...),
-		)
-		c.StreamTags = removeDuplicateStr(
-			append(c.StreamTags, []string{"ENVTuber"}...),
-		)
-
-		// Disable VNyan Stuff.
-		c.OutfitPoll = false
-		c.VNyanOutfit = ""
-
-		// Disable incompatible redeems.
-		c.NoBeanie = false
-
-	// VTube Studio Settings
-	case "VTS":
-		c.StreamTags = removeDuplicateStr(
-			append([]string{"VTuber", "RedPanda", "Furry"}, c.StreamTags...),
-		)
-		c.StreamTags = removeDuplicateStr(
-			append(c.StreamTags, []string{"ENVTuber"}...),
-		)
-
-		// Disable VNyan Stuff
-		c.OutfitPoll = false
-		c.VNyanOutfit = ""
-
-		// Disable incompatible redeems.
-		c.NoBeanie = false
-
-	// VNyan Settings
-	case "VNyan":
-		c.StreamTags = removeDuplicateStr(
-			append([]string{"VTuber", "RedPanda", "Furry"}, c.StreamTags...),
-		)
-		c.StreamTags = removeDuplicateStr(
-			append(c.StreamTags, []string{"ENVTuber"}...),
-		)
-
-		// Outfit overrides.
-		if c.VNyanOutfit != "" {
-			c.OutfitPoll = false
-		}
-
-		// Disable incompatible redeems.
-		c.NoBeanie = false
-	}
-
 	// Twitch supports max 10 tags.
 	tagCount := len(c.StreamTags)
 	slog.Debug("Found " + strconv.Itoa(tagCount) + " tags...")
 	if tagCount > 10 {
 		slog.Debug("More than 10 tags found. Please clean some of them up!")
 		c.StreamTags = c.StreamTags[:10]
-	}
-
-	// Oncall overrides.
-	if *onCall || c.OnCall {
-		c.OnCall = true
-		c.BedTime = false
-		c.CreepyTime = false
-		c.RaidRoulette = false
 	}
 
 	return c
@@ -349,11 +192,6 @@ func main() {
 	if *debug {
 		handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug})
 		slog.SetDefault(slog.New(handler))
-	}
-
-	if !validVTuberSoftware[defaultVTuberSoftware] {
-		slog.Error("defaultVTuberSoftware is not a valid value. Fix it and recompile!")
-		os.Exit(1)
 	}
 
 	if *game == "" {
@@ -396,8 +234,6 @@ func main() {
 	// Included/Nested configs will be recursed during each merge.
 	slog.Debug("Merging configs...")
 	twitchConfigs := newConfig()
-	// Start with the defaultVTuberSoftware.
-	twitchConfigs.VTuberSoftware = defaultVTuberSoftware
 
 	// global
 	if globalConfig.GameFound {
