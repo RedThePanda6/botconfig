@@ -247,6 +247,8 @@ func mergeConfigs(o config, n config) config {
 				o = mergeConfigs(o, i)
 			}
 			includesSeen[includeFile] = true
+		} else {
+			slog.Debug("    Already seen " + n.Include + " in another config...")
 		}
 	}
 
