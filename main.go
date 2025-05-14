@@ -29,21 +29,21 @@ var (
 	dayOverride  = flag.String("dayOverride", "", "Manually set day for testing.")
 	dateOverride = flag.String("dateOverride", "", "Manually set date for testing.")
 	// Default tags to apply if no game configuration is found.
-	defaultTags  = []string{}
+	defaultTags = []string{}
 	// A list of all include files read by filename to avoid processing duplicates.
 	// Mostly as a cheap backstop to prevent a recursive loop of includes.
-	includesSeen        = map[string]bool{}
+	includesSeen = map[string]bool{}
 )
 
 type config struct {
 	// Includes
 	Include string `json:"include"`
 	// Stream Settings
-	StreamTags     []string `json:"streamtags"`
-	TitleSuffix    string   `json:"titlesuffix"`
+	StreamTags  []string `json:"streamtags"`
+	TitleSuffix string   `json:"titlesuffix"`
 	// Control
-	GameFound     bool   `json:"gamefound"`
-	GameName      string `json:"gamename"`
+	GameFound bool   `json:"gamefound"`
+	GameName  string `json:"gamename"`
 }
 
 func newConfig() config {
@@ -156,6 +156,8 @@ func mergeConfigs(o config, n config) config {
 				o = mergeConfigs(o, i)
 			}
 			includesSeen[includeFile] = true
+		} else {
+			slog.Debug("    Already seen " + n.Include + " in another config...")
 		}
 	}
 
