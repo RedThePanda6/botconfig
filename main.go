@@ -26,6 +26,12 @@ var (
 		"D:\\Temp\\config.json",
 		"The output file we write merged configs to.",
 	)
+	writeSchema = flag.Bool("writeSchema", true, "Write a schema file?")
+	schemaFile  = flag.String(
+		"schemaFile",
+		"G:\\My Drive\\Streaming\\Chatbot\\twitch_configs\\schema.json",
+		"The schema file used to validate configs.",
+	)
 	onCall       = flag.Bool("oncall", false, "Am I oncall for work?")
 	dayOverride  = flag.String("dayOverride", "", "Manually set day for testing.")
 	dateOverride = flag.String("dateOverride", "", "Manually set date for testing.")
@@ -345,6 +351,71 @@ func sanitizeGame(s string) string {
 	return s
 }
 
+func writeSchemaFile() {
+	f := *schemaFile
+	config := newConfig()
+
+	// Handle properties separately.
+	properties := make(map[string]interface{})
+	// Special cases or properties outside of struct.
+	properties["_comment"] = map[string]interface{}{
+		"type": "string",
+	}
+	properties["$schema"] = map[string]interface{}{
+		"type": "string",
+	}
+	properties["streamtags"] = map[string]interface{}{
+		"type": "array",
+		"items": []map[string]interface{}{
+			{"type": "string"},
+		},
+	}
+
+	r := reflect.ValueOf(config)
+
+	for i := range r.NumField() {
+		n := strings.ToLower(r.Type().Field(i).Name)
+		t := r.Type().Field(i).Type.String()
+
+		switch t {
+		case "int":
+			t = "integer"
+		case "bool":
+			t = "boolean"
+		}
+
+		if n != "streamtags" {
+			properties[n] = map[string]interface{}{
+				// Need to find a way to convert type to a text string.
+				"type": t,
+			}
+		}
+	}
+
+	schema := make(map[string]interface{})
+	schema["type"] = "object"
+	schema["additionalProperties"] = false
+	schema["properties"] = properties
+
+	outputFile, err := os.Create(f)
+	if err != nil {
+		slog.Debug("Error creating schema file:", err.Error(), err)
+	}
+	defer outputFile.Close()
+
+	output, _ := json.MarshalIndent(schema, "", "  ")
+
+	_, err = outputFile.Write(output)
+	if err != nil {
+		slog.Debug("Error writing config file:", err.Error(), err)
+	}
+
+	outputFile.Sync()
+
+	w := bufio.NewWriter(outputFile)
+	w.Flush()
+}
+
 func main() {
 	flag.Parse()
 
@@ -445,6 +516,11 @@ func main() {
 	// Write out JSON.
 	if err := json.NewEncoder(os.Stdout).Encode(twitchConfigs); err != nil {
 		panic(err)
+	}
+
+	// Write out JSOB schema.
+	if *writeSchema {
+		writeSchemaFile()
 	}
 
 	slog.Debug("End of Line.")
