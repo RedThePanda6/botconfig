@@ -26,7 +26,7 @@ var (
 		"D:\\Temp\\config.json",
 		"The output file we write merged configs to.",
 	)
-	writeSchema = flag.Bool("writeSchema", true, "Write a schema file?")
+	writeSchema = flag.Bool("writeSchema", false, "Write a schema file?")
 	schemaFile  = flag.String(
 		"schemaFile",
 		"G:\\My Drive\\Streaming\\Chatbot\\twitch_configs\\schema.json",
@@ -518,7 +518,7 @@ func main() {
 		panic(err)
 	}
 
-	// Write out JSOB schema.
+	// Write out JSON schema.
 	if *writeSchema {
 		writeSchemaFile()
 	}
