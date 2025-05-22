@@ -21,7 +21,8 @@ var (
 		"G:\\My Drive\\Streaming\\Chatbot\\twitch_configs\\",
 		"Root folder where configs are found.",
 	)
-	outFile = flag.String(
+	writeJSONFile = flag.Bool("writeJSONFile", true, "Write a JSON file?")
+	outFile       = flag.String(
 		"outFile",
 		"D:\\Temp\\config.json",
 		"The output file we write merged configs to.",
@@ -275,8 +276,10 @@ func main() {
 	twitchConfigs.GameFound = gameConfig.GameFound
 
 	// Write to output file.
-	slog.Debug("Writing output...")
-	writeToFile(*outFile, twitchConfigs)
+	if *writeJSONFile {
+		slog.Debug("Writing JSON file...")
+		writeToFile(*outFile, twitchConfigs)
+	}
 
 	// Write out JSON.
 	if err := json.NewEncoder(os.Stdout).Encode(twitchConfigs); err != nil {
