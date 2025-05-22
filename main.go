@@ -21,7 +21,8 @@ var (
 		"G:\\My Drive\\Streaming\\Chatbot\\twitch_configs\\",
 		"Root folder where configs are found.",
 	)
-	outFile = flag.String(
+	writeJSONFile = flag.Bool("writeJSONFile", true, "Write a JSON file?")
+	outFile       = flag.String(
 		"outFile",
 		"D:\\Temp\\config.json",
 		"The output file we write merged configs to.",
@@ -377,6 +378,7 @@ func writeSchemaFile() {
 		n := strings.ToLower(r.Type().Field(i).Name)
 		t := r.Type().Field(i).Type.String()
 
+		// Convert type string to valid JSON schema values.
 		switch t {
 		case "int":
 			t = "integer"
@@ -386,7 +388,6 @@ func writeSchemaFile() {
 
 		if n != "streamtags" {
 			properties[n] = map[string]interface{}{
-				// Need to find a way to convert type to a text string.
 				"type": t,
 			}
 		}
@@ -510,8 +511,10 @@ func main() {
 	twitchConfigs.GameFound = gameConfig.GameFound
 
 	// Write to output file.
-	slog.Debug("Writing output...")
-	writeToFile(*outFile, twitchConfigs)
+	if *writeJSONFile {
+		slog.Debug("Writing JSON file...")
+		writeToFile(*outFile, twitchConfigs)
+	}
 
 	// Write out JSON.
 	if err := json.NewEncoder(os.Stdout).Encode(twitchConfigs); err != nil {
@@ -520,6 +523,7 @@ func main() {
 
 	// Write out JSON schema.
 	if *writeSchema {
+		slog.Debug("Writing schema file...")
 		writeSchemaFile()
 	}
 
