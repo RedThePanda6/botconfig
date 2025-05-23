@@ -93,6 +93,7 @@ type config struct {
 	// if we have a config for the game as well as to signal if we've found a
 	// config file here so we don't need to merge "empty" configs.
 	EndHour       int    `json:"endhour"`
+	EndMinute     int    `json:"endminute"`
 	GameFound     bool   `json:"gamefound"`
 	GameName      string `json:"gamename"`
 	OnCall        bool   `json:"oncall"`
@@ -206,6 +207,10 @@ func mergeConfigs(o config, n config) config {
 
 	if n.EndHour != 0 {
 		o.EndHour = n.EndHour
+	}
+
+	if n.EndMinute != 0 {
+		o.EndMinute = n.EndMinute
 	}
 
 	// Pull all bools from config struct to resolve them.
