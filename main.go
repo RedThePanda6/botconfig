@@ -249,7 +249,7 @@ func main() {
 		slog.Debug("  Game configs...")
 		twitchConfigs = mergeConfigs(twitchConfigs, gameConfig)
 	} else {
-		// If we don't find the game file then add teh defaultTags.
+		// If we don't find the game file then add the defaultTags.
 		twitchConfigs.StreamTags = removeDuplicateStr(
 			append(twitchConfigs.StreamTags, defaultTags...),
 		)
@@ -272,7 +272,7 @@ func main() {
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
-	twitchConfigs.GameName = saneGame
+	twitchConfigs.GameName = *game
 	twitchConfigs.GameFound = gameConfig.GameFound
 
 	// Write to output file.
