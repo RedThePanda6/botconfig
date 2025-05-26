@@ -282,10 +282,7 @@ func applyOverrides(c config) config {
 	// PNGTuber Settings
 	case "Veadotube":
 		c.StreamTags = removeDuplicateStr(
-			append([]string{"VTuber", "RedPanda"}, c.StreamTags...),
-		)
-		c.StreamTags = removeDuplicateStr(
-			append(c.StreamTags, []string{"ENVTuber"}...),
+			append([]string{"VTuber", "RedPanda", "ENVTuber"}, c.StreamTags...),
 		)
 
 		// Disable VNyan Stuff.
@@ -298,10 +295,7 @@ func applyOverrides(c config) config {
 	// VTube Studio Settings
 	case "VTS":
 		c.StreamTags = removeDuplicateStr(
-			append([]string{"VTuber", "RedPanda", "Furry"}, c.StreamTags...),
-		)
-		c.StreamTags = removeDuplicateStr(
-			append(c.StreamTags, []string{"ENVTuber"}...),
+			append([]string{"VTuber", "RedPanda", "Furry", "ENVTuber"}, c.StreamTags...),
 		)
 
 		// Disable VNyan Stuff
@@ -314,10 +308,7 @@ func applyOverrides(c config) config {
 	// VNyan Settings
 	case "VNyan":
 		c.StreamTags = removeDuplicateStr(
-			append([]string{"VTuber", "RedPanda", "Furry"}, c.StreamTags...),
-		)
-		c.StreamTags = removeDuplicateStr(
-			append(c.StreamTags, []string{"ENVTuber"}...),
+			append([]string{"VTuber", "RedPanda", "Furry", "ENVTuber"}, c.StreamTags...),
 		)
 
 		// Outfit overrides.
@@ -362,17 +353,17 @@ func writeSchemaFile() {
 	config := newConfig()
 
 	// Handle properties separately.
-	properties := make(map[string]interface{})
+	properties := make(map[string]any)
 	// Special cases or properties outside of struct.
-	properties["_comment"] = map[string]interface{}{
+	properties["_comment"] = map[string]any{
 		"type": "string",
 	}
-	properties["$schema"] = map[string]interface{}{
+	properties["$schema"] = map[string]any{
 		"type": "string",
 	}
-	properties["streamtags"] = map[string]interface{}{
+	properties["streamtags"] = map[string]any{
 		"type": "array",
-		"items": []map[string]interface{}{
+		"items": []map[string]any{
 			{"type": "string"},
 		},
 	}
@@ -381,6 +372,11 @@ func writeSchemaFile() {
 
 	for i := range r.NumField() {
 		n := strings.ToLower(r.Type().Field(i).Name)
+		// streamtags are handled specially.
+		if n == "streamtags" {
+			continue
+		}
+
 		t := r.Type().Field(i).Type.String()
 
 		// Convert type string to valid JSON schema values.
@@ -391,14 +387,12 @@ func writeSchemaFile() {
 			t = "boolean"
 		}
 
-		if n != "streamtags" {
-			properties[n] = map[string]interface{}{
-				"type": t,
-			}
+		properties[n] = map[string]any{
+			"type": t,
 		}
 	}
 
-	schema := make(map[string]interface{})
+	schema := make(map[string]any)
 	schema["type"] = "object"
 	schema["additionalProperties"] = false
 	schema["properties"] = properties
@@ -489,7 +483,7 @@ func main() {
 		slog.Debug("  Game configs...")
 		twitchConfigs = mergeConfigs(twitchConfigs, gameConfig)
 	} else {
-		// If we don't find the game file then add teh defaultTags.
+		// If we don't find the game file then add the defaultTags.
 		twitchConfigs.StreamTags = removeDuplicateStr(
 			append(twitchConfigs.StreamTags, defaultTags...),
 		)
@@ -512,7 +506,7 @@ func main() {
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
-	twitchConfigs.GameName = saneGame
+	twitchConfigs.GameName = *game
 	twitchConfigs.GameFound = gameConfig.GameFound
 
 	// Write to output file.
