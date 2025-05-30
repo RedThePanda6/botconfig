@@ -92,13 +92,14 @@ type config struct {
 	// Note that GameFound serves the dual purpose to communicate to StreamerBot
 	// if we have a config for the game as well as to signal if we've found a
 	// config file here so we don't need to merge "empty" configs.
-	EndHour       int    `json:"endhour"`
-	EndMinute     int    `json:"endminute"`
-	GameFound     bool   `json:"gamefound"`
-	GameName      string `json:"gamename"`
-	OnCall        bool   `json:"oncall"`
-	PauseableGame bool   `json:"pauseablegame"`
-	YTGameInTitle bool   `json:"ytgameintitle"`
+	EndHour         int    `json:"endhour"`
+	EndMinute       int    `json:"endminute"`
+	GameFound       bool   `json:"gamefound"`
+	GameName        string `json:"gamename"`
+	NoiseCancelling bool   `json:"noisecancelling"`
+	OnCall          bool   `json:"oncall"`
+	PauseableGame   bool   `json:"pauseablegame"`
+	YTGameInTitle   bool   `json:"ytgameintitle"`
 }
 
 func newConfig() config {
@@ -328,6 +329,9 @@ func applyOverrides(c config) config {
 		c.StreamTags = c.StreamTags[:10]
 	}
 
+	// Set GameName to passed in value.
+	c.GameName = *game
+
 	// Oncall overrides.
 	if *onCall || c.OnCall {
 		c.OnCall = true
@@ -506,7 +510,6 @@ func main() {
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
-	twitchConfigs.GameName = *game
 	twitchConfigs.GameFound = gameConfig.GameFound
 
 	// Write to output file.
