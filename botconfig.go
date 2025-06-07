@@ -92,14 +92,15 @@ type config struct {
 	// Note that GameFound serves the dual purpose to communicate to StreamerBot
 	// if we have a config for the game as well as to signal if we've found a
 	// config file here so we don't need to merge "empty" configs.
-	EndHour         int    `json:"endhour"`
-	EndMinute       int    `json:"endminute"`
-	GameFound       bool   `json:"gamefound"`
-	GameName        string `json:"gamename"`
-	NoiseCancelling bool   `json:"noisecancelling"`
-	OnCall          bool   `json:"oncall"`
-	PauseableGame   bool   `json:"pauseablegame"`
-	YTGameInTitle   bool   `json:"ytgameintitle"`
+	EndHour           int    `json:"endhour"`
+	EndMinute         int    `json:"endminute"`
+	GameFound         bool   `json:"gamefound"`
+	GameName          string `json:"gamename"`
+	SanitizedGameName string `json:"sanitizedgamename"`
+	NoiseCancelling   bool   `json:"noisecancelling"`
+	OnCall            bool   `json:"oncall"`
+	PauseableGame     bool   `json:"pauseablegame"`
+	YTGameInTitle     bool   `json:"ytgameintitle"`
 }
 
 func newConfig() config {
@@ -253,13 +254,13 @@ func mergeConfigs(o config, n config) config {
 		includeFile := fmt.Sprintf("%sincludes\\%s.json", *configRoot, n.Include)
 		// Skip if we've read this file before.
 		if !includesSeen[includeFile] {
+			includesSeen[includeFile] = true
 			i := readFromFile(includeFile)
 
 			if i.GameFound {
 				slog.Debug("    Inlcuded " + n.Include + " configs...")
 				o = mergeConfigs(o, i)
 			}
-			includesSeen[includeFile] = true
 		} else {
 			slog.Debug("    Already seen " + n.Include + " in another config...")
 		}
@@ -510,6 +511,7 @@ func main() {
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
+	twitchConfigs.SanitizedGameName = saneGame
 	twitchConfigs.GameFound = gameConfig.GameFound
 
 	// Write to output file.
