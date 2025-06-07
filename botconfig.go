@@ -150,13 +150,13 @@ func mergeConfigs(o config, n config) config {
 		includeFile := fmt.Sprintf("%sincludes\\%s.json", *configRoot, n.Include)
 		// Skip if we've read this file before.
 		if !includesSeen[includeFile] {
+			includesSeen[includeFile] = true
 			i := readFromFile(includeFile)
 
 			if i.GameFound {
 				slog.Debug("    Inlcuded " + n.Include + " configs...")
 				o = mergeConfigs(o, i)
 			}
-			includesSeen[includeFile] = true
 		} else {
 			slog.Debug("    Already seen " + n.Include + " in another config...")
 		}
@@ -176,6 +176,9 @@ func applyOverrides(c config) config {
 		slog.Debug("More than 10 tags found. Please clean some of them up!")
 		c.StreamTags = c.StreamTags[:10]
 	}
+
+	// Set GameName to passed in value.
+	c.GameName = *game
 
 	return c
 }
@@ -272,7 +275,6 @@ func main() {
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
-	twitchConfigs.GameName = *game
 	twitchConfigs.GameFound = gameConfig.GameFound
 
 	// Write to output file.
