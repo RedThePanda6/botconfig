@@ -187,6 +187,25 @@ func mergeConfigs(o config, n config) config {
 		append(o.StreamTags, n.StreamTags...),
 	)
 
+	// Keep include processing first!
+	// Reason being to have original take precedent over the include.
+	// (Last config applied wins.)
+	if n.Include != "" {
+		includeFile := fmt.Sprintf("%sincludes\\%s.json", *configRoot, n.Include)
+		// Skip if we've read this file before.
+		if !includesSeen[includeFile] {
+			includesSeen[includeFile] = true
+			i := readFromFile(includeFile)
+
+			if i.GameFound {
+				slog.Debug("    Inlcuded " + n.Include + " configs...")
+				o = mergeConfigs(o, i)
+			}
+		} else {
+			slog.Debug("    Already seen " + n.Include + " in another config...")
+		}
+	}
+
 	if n.VTuberSoftware != "" {
 		if validVTuberSoftware[n.VTuberSoftware] {
 			o.VTuberSoftware = n.VTuberSoftware
@@ -246,24 +265,6 @@ func mergeConfigs(o config, n config) config {
 	// Talking Scene Cost
 	if n.LPTalkingCost != defaultLPTalkingCost {
 		o.LPTalkingCost = n.LPTalkingCost
-	}
-
-	// Keep include processing last!
-	// Unless this produces bad results then we adjust.
-	if n.Include != "" {
-		includeFile := fmt.Sprintf("%sincludes\\%s.json", *configRoot, n.Include)
-		// Skip if we've read this file before.
-		if !includesSeen[includeFile] {
-			includesSeen[includeFile] = true
-			i := readFromFile(includeFile)
-
-			if i.GameFound {
-				slog.Debug("    Inlcuded " + n.Include + " configs...")
-				o = mergeConfigs(o, i)
-			}
-		} else {
-			slog.Debug("    Already seen " + n.Include + " in another config...")
-		}
 	}
 
 	return o
