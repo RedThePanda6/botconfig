@@ -78,6 +78,7 @@ type config struct {
 	BedTime       bool `json:"bedtime"`
 	ChosenOne     bool `json:"chosenone"`
 	CreepyTime    bool `json:"creepytime"`
+	JibberJabbey  bool `json:"jibberjabbey"`
 	LPGameCost    int  `json:"lpgamecost"`
 	LPTalkingCost int  `json:"lptalkingcost"`
 	NameAThing    bool `json:"nameathing"`
@@ -107,6 +108,7 @@ func newConfig() config {
 	// For setting non-standard default values.
 	return config{
 		ChosenOne:      true,
+		JibberJabbey:   true,
 		LPGameCost:     defaultLPGameCost,
 		LPTalkingCost:  defaultLPTalkingCost,
 		NoGlasses:      true,
