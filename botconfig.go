@@ -75,16 +75,17 @@ type config struct {
 	OutfitPoll   bool `json:"outfitpoll"`
 	SongRequests bool `json:"songrequests"`
 	// Rewards
-	BedTime       bool `json:"bedtime"`
-	ChosenOne     bool `json:"chosenone"`
-	CreepyTime    bool `json:"creepytime"`
-	JibberJabbey  bool `json:"jibberjabbey"`
-	LPGameCost    int  `json:"lpgamecost"`
-	LPTalkingCost int  `json:"lptalkingcost"`
-	NameAThing    bool `json:"nameathing"`
-	NoBeanie      bool `json:"nobeanie"`
-	NoGlasses     bool `json:"noglasses"`
-	RaidRoulette  bool `json:"raidroulette"`
+	BambooRequestCost int  `json:"bamboorequestcost"`
+	BedTime           bool `json:"bedtime"`
+	ChosenOne         bool `json:"chosenone"`
+	CreepyTime        bool `json:"creepytime"`
+	JibberJabbey      bool `json:"jibberjabbey"`
+	LPGameCost        int  `json:"lpgamecost"`
+	LPTalkingCost     int  `json:"lptalkingcost"`
+	NameAThing        bool `json:"nameathing"`
+	NoBeanie          bool `json:"nobeanie"`
+	NoGlasses         bool `json:"noglasses"`
+	RaidRoulette      bool `json:"raidroulette"`
 	// Commands
 	// Bot Functions
 	Modlist        bool `json:"modlist"`
@@ -107,17 +108,18 @@ type config struct {
 func newConfig() config {
 	// For setting non-standard default values.
 	return config{
-		ChosenOne:      true,
-		JibberJabbey:   true,
-		LPGameCost:     defaultLPGameCost,
-		LPTalkingCost:  defaultLPTalkingCost,
-		NoGlasses:      true,
-		NotifyInterval: 5,
-		OutfitPoll:     true,
-		PandaSign:      "default",
-		PauseableGame:  true,
-		RaidRoulette:   true,
-		YTGameInTitle:  true,
+		BambooRequestCost: 20,
+		ChosenOne:         true,
+		JibberJabbey:      true,
+		LPGameCost:        defaultLPGameCost,
+		LPTalkingCost:     defaultLPTalkingCost,
+		NoGlasses:         true,
+		NotifyInterval:    5,
+		OutfitPoll:        true,
+		PandaSign:         "default",
+		PauseableGame:     true,
+		RaidRoulette:      true,
+		YTGameInTitle:     true,
 	}
 }
 
@@ -267,6 +269,12 @@ func mergeConfigs(o config, n config) config {
 	// Talking Scene Cost
 	if n.LPTalkingCost != defaultLPTalkingCost {
 		o.LPTalkingCost = n.LPTalkingCost
+	}
+
+	// Bamboo Request Cost
+	// Go with whichever is higher.
+	if n.BambooRequestCost > o.BambooRequestCost {
+		o.BambooRequestCost = n.BambooRequestCost
 	}
 
 	return o
