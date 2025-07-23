@@ -139,11 +139,11 @@ func readFromFile(f string) config {
 	c := newConfig()
 	c.GameFound = true
 	configFile, err := os.Open(f)
-	defer configFile.Close()
 	if err != nil {
 		slog.Debug("Error loading config:", err.Error(), err)
 		c.GameFound = false
 	}
+	defer configFile.Close()
 	jsonParser := json.NewDecoder(configFile)
 	jsonParser.Decode(&c)
 	return c
@@ -465,6 +465,8 @@ func main() {
 		date = *dateOverride
 	}
 	slog.Debug("Date is " + date + "...")
+	yeardate := fmt.Sprintf(date + "-" + strconv.Itoa(time.Now().Year()))
+	slog.Debug("Date w/Year is " + yeardate + "...")
 
 	saneGame := sanitizeGame(*game)
 
@@ -473,6 +475,7 @@ func main() {
 	gameFile := fmt.Sprintf("%sgames\\%s.json", *configRoot, saneGame)
 	dayFile := fmt.Sprintf("%sday\\%s.json", *configRoot, weekday)
 	dateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
+	yeardateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, yeardate)
 
 	// Read the JSON files into data structures.
 	slog.Debug("Reading configs...")
@@ -480,6 +483,7 @@ func main() {
 	gameConfig := readFromFile(gameFile)
 	dayConfig := readFromFile(dayFile)
 	dateConfig := readFromFile(dateFile)
+	yeardateConfig := readFromFile(yeardateFile)
 
 	// Combine the JSON files with preference for gameConfig.
 	// Included/Nested configs will be recursed during each merge.
@@ -515,6 +519,12 @@ func main() {
 	if dateConfig.GameFound {
 		slog.Debug("  Date configs...")
 		twitchConfigs = mergeConfigs(twitchConfigs, dateConfig)
+	}
+
+	// date w/ year
+	if yeardateConfig.GameFound {
+		slog.Debug("  Date w/Year configs...")
+		twitchConfigs = mergeConfigs(twitchConfigs, yeardateConfig)
 	}
 
 	// Apply overrides.
