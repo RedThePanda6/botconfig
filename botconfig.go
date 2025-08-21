@@ -24,7 +24,7 @@ var (
 	writeJSONFile = flag.Bool("writeJSONFile", true, "Write a JSON file?")
 	outFile       = flag.String(
 		"outFile",
-		"D:\\Temp\\config.json",
+		"D:\\Temp\\twitch_config.json",
 		"The output file we write merged configs to.",
 	)
 	writeSchema = flag.Bool("writeSchema", false, "Write a schema file?")
@@ -79,12 +79,13 @@ type config struct {
 	BedTime           bool `json:"bedtime"`
 	ChosenOne         bool `json:"chosenone"`
 	CreepyTime        bool `json:"creepytime"`
+	CursedModel       bool `json:"cursedmodel"`
 	JibberJabbey      bool `json:"jibberjabbey"`
 	LPGameCost        int  `json:"lpgamecost"`
 	LPTalkingCost     int  `json:"lptalkingcost"`
 	NameAThing        bool `json:"nameathing"`
 	NoBeanie          bool `json:"nobeanie"`
-	NoGlasses         bool `json:"noglasses"`
+	NoGlasses         bool `json:"noglasses"` // Remove this with next large update.
 	RaidRoulette      bool `json:"raidroulette"`
 	// Commands
 	// Bot Functions
@@ -99,7 +100,7 @@ type config struct {
 	GameFound         bool   `json:"gamefound"`
 	GameName          string `json:"gamename"`
 	SanitizedGameName string `json:"sanitizedgamename"`
-	NoiseCancelling   bool   `json:"noisecancelling"`
+	NoiseCancelling   bool   `json:"noisecancelling"` // Remove this with next large update.
 	OnCall            bool   `json:"oncall"`
 	PauseableGame     bool   `json:"pauseablegame"`
 	YTGameInTitle     bool   `json:"ytgameintitle"`
@@ -114,6 +115,7 @@ func newConfig() config {
 		LPGameCost:        defaultLPGameCost,
 		LPTalkingCost:     defaultLPTalkingCost,
 		NoGlasses:         true,
+		NoiseCancelling:   true,
 		NotifyInterval:    5,
 		OutfitPoll:        true,
 		PandaSign:         "default",
@@ -304,6 +306,7 @@ func applyOverrides(c config) config {
 
 		// Disable incompatible redeems.
 		c.NoBeanie = false
+		c.CursedModel = false
 
 	// VTube Studio Settings
 	case "VTS":
@@ -317,6 +320,7 @@ func applyOverrides(c config) config {
 
 		// Disable incompatible redeems.
 		c.NoBeanie = false
+		c.CursedModel = false
 
 	// VNyan Settings
 	case "VNyan":
@@ -331,6 +335,11 @@ func applyOverrides(c config) config {
 
 		// Disable incompatible redeems.
 		c.NoBeanie = false
+
+	// Facecam Settings
+	case "None":
+		// Disable incompatible redeems.
+		c.CursedModel = false
 	}
 
 	// Twitch supports max 10 tags.
