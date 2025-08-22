@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -425,17 +424,14 @@ func writeSchemaFile() {
 	}
 	defer outputFile.Close()
 
-	output, _ := json.MarshalIndent(schema, "", "  ")
+	encoder := json.NewEncoder(outputFile)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
 
-	_, err = outputFile.Write(output)
+	err = encoder.Encode(schema)
 	if err != nil {
 		slog.Debug("Error writing config file:", err.Error(), err)
 	}
-
-	outputFile.Sync()
-
-	w := bufio.NewWriter(outputFile)
-	w.Flush()
 }
 
 func main() {
