@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -89,17 +88,14 @@ func writeToFile(f string, c config) {
 	}
 	defer outputFile.Close()
 
-	output, _ := json.MarshalIndent(c, "", "  ")
+	encoder := json.NewEncoder(outputFile)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
 
-	_, err = outputFile.Write(output)
+	err = encoder.Encode(c)
 	if err != nil {
 		slog.Debug("Error writing config file:", err.Error(), err)
 	}
-
-	outputFile.Sync()
-
-	w := bufio.NewWriter(outputFile)
-	w.Flush()
 }
 
 func removeDuplicateStr(strSlice []string) []string {
@@ -295,7 +291,10 @@ func main() {
 	}
 
 	// Write out JSON.
-	if err := json.NewEncoder(os.Stdout).Encode(twitchConfigs); err != nil {
+	// Disable SetEscapeHTML to hopefully avoid mangling characters in titlesuffix.
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetEscapeHTML(false)
+	if err := encoder.Encode(twitchConfigs); err != nil {
 		panic(err)
 	}
 
