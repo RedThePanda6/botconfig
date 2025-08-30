@@ -41,33 +41,33 @@ type config struct {
 	// Includes
 	Include string `json:"include"`
 	// Control
-	ModelFileName string `json:"modelfilename"`
 	ConfigFound   bool   `json:"configfound"`
+	ModelFileName string `json:"modelfilename"`
+	Software      string `json:"software"`
 	// Redeems
 	AnvilDrop     bool `json:"anvildrop"`
 	ASCIIRed      bool `json:"asciired"`
 	Bonk          bool `json:"bonk"`
 	Boop          bool `json:"boop"`
 	Chaos         bool `json:"chaos"`
-	CursedModel   bool `json:"cursedmodel"`
 	Feets         bool `json:"feets"`
+	Fisheye       bool `json:"fisheye"`
+	Headpats      bool `json:"headpats"`
+	NoGlasses     bool `json:"noglasses"`
 	NuggiesForRed bool `json:"nuggiesforred"`
 	PeltThePanda  bool `json:"peltthepanda"`
 	PieDrop       bool `json:"piedrop"`
+	PostItRed     bool `json:"postitred"`
 	RandomOutfit  bool `json:"randomoutfit"`
+	RedInABox     bool `json:"redinabox"`
+	RentThisHat   bool `json:"rentthishat"`
 	SpinThePanda  bool `json:"spinthepanda"`
 	SprayBottle   bool `json:"spraybottle"`
+	SuspiciousRed bool `json:"suspiciousred"`
 	SwolePanda    bool `json:"swolepanda"`
 	Tail          bool `json:"tail"`
 	TimeWarpScan  bool `json:"timewarpscan"`
 	ToughLove     bool `json:"toughlove"`
-	Fisheye       bool `json:"fisheye"`
-	NoGlasses     bool `json:"noglasses"`
-	Headpats      bool `json:"headpats"`
-	PostItRed     bool `json:"postitred"`
-	RedInABox     bool `json:"redinabox"`
-	RentThisHat   bool `json:"rentthishat"`
-	SuspiciousRed bool `json:"suspiciousred"`
 }
 
 func newConfig() config {
@@ -186,12 +186,39 @@ func mergeConfigs(o config, n config) config {
 		)
 	}
 
+	// Export which software we've selected.
+	// I assume this could be useful. At least for troubleshooting.
+	if n.Software != "" {
+		o.Software = n.Software
+	}
+
 	return o
 }
 
 func applyOverrides(c config) config {
 	// Values that don't need to be passed into StreamerBot.
 	c.Include = ""
+
+	// No config found means no model is found.
+	// Disable all redeems.
+	if !c.ConfigFound {
+		allBools := []string{}
+
+		r := reflect.ValueOf(c)
+
+		// There's probably a better way to do this but I'm lazy right now.
+		for i := range r.NumField() {
+			if r.Field(i).Kind() == reflect.Bool {
+				allBools = append(allBools, r.Type().Field(i).Name)
+			}
+		}
+
+		for _, f := range allBools {
+			reflect.ValueOf(&c).Elem().FieldByName(f).SetBool(
+				false,
+			)
+		}
+	}
 
 	return c
 }
@@ -294,12 +321,14 @@ func main() {
 		config = mergeConfigs(config, modelConfig)
 	}
 
+	// Set ConfigFound to model's setting before we apply overrides.
+	config.ConfigFound = modelConfig.ConfigFound
+
 	// Apply overrides.
 	config = applyOverrides(config)
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
-	config.ConfigFound = modelConfig.ConfigFound
 	config.ModelFileName = saneModelFile
 
 	// Write to output file.
