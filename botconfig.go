@@ -44,7 +44,13 @@ var (
 	defaultLPGameCost    = defaultLPTalkingCost * 2
 	// A list of all include files read by filename to avoid processing duplicates.
 	// Mostly as a cheap backstop to prevent a recursive loop of includes.
-	includesSeen        = map[string]bool{}
+	includesSeen = map[string]bool{}
+	// We now set this within StreamerBot based on which programs are running.
+	vtuberSoftware = flag.String(
+		"vtuberSoftware",
+		defaultVTuberSoftware,
+		"Which VTuber Software we set tags for.",
+	)
 	validVTuberSoftware = map[string]bool{
 		"None":      true,
 		"Veadotube": true,
@@ -60,7 +66,7 @@ type config struct {
 	// Stream Settings
 	StreamTags     []string `json:"streamtags"`
 	TitleSuffix    string   `json:"titlesuffix"`
-	VTuberSoftware string   `json:"vtubersoftware"`
+	VTuberSoftware string   `json:"vtubersoftware"` // Move to flag so we can set stream tags.
 	// Model Options
 	VNyanOutfit string `json:"vnyanoutfit"`
 	// Overlays
@@ -78,13 +84,11 @@ type config struct {
 	BedTime           bool `json:"bedtime"`
 	ChosenOne         bool `json:"chosenone"`
 	CreepyTime        bool `json:"creepytime"`
-	CursedModel       bool `json:"cursedmodel"`
 	JibberJabbey      bool `json:"jibberjabbey"`
 	LPGameCost        int  `json:"lpgamecost"`
 	LPTalkingCost     int  `json:"lptalkingcost"`
 	NameAThing        bool `json:"nameathing"`
 	NoBeanie          bool `json:"nobeanie"`
-	NoGlasses         bool `json:"noglasses"` // Remove this with next large update.
 	RaidRoulette      bool `json:"raidroulette"`
 	// Commands
 	// Bot Functions
@@ -99,7 +103,6 @@ type config struct {
 	GameFound         bool   `json:"gamefound"`
 	GameName          string `json:"gamename"`
 	SanitizedGameName string `json:"sanitizedgamename"`
-	NoiseCancelling   bool   `json:"noisecancelling"` // Remove this with next large update.
 	OnCall            bool   `json:"oncall"`
 	PauseableGame     bool   `json:"pauseablegame"`
 	YTGameInTitle     bool   `json:"ytgameintitle"`
@@ -113,8 +116,6 @@ func newConfig() config {
 		JibberJabbey:      true,
 		LPGameCost:        defaultLPGameCost,
 		LPTalkingCost:     defaultLPTalkingCost,
-		NoGlasses:         true,
-		NoiseCancelling:   true,
 		NotifyInterval:    5,
 		OutfitPoll:        true,
 		PandaSign:         "default",
@@ -302,7 +303,6 @@ func applyOverrides(c config) config {
 
 		// Disable incompatible redeems.
 		c.NoBeanie = false
-		c.CursedModel = false
 
 	// VTube Studio Settings
 	case "VTS":
@@ -316,7 +316,6 @@ func applyOverrides(c config) config {
 
 		// Disable incompatible redeems.
 		c.NoBeanie = false
-		c.CursedModel = false
 
 	// VNyan Settings
 	case "VNyan":
@@ -335,7 +334,6 @@ func applyOverrides(c config) config {
 	// Facecam Settings
 	case "None":
 		// Disable incompatible redeems.
-		c.CursedModel = false
 	}
 
 	// Twitch supports max 10 tags.
@@ -491,8 +489,8 @@ func main() {
 	// Included/Nested configs will be recursed during each merge.
 	slog.Debug("Merging configs...")
 	twitchConfigs := newConfig()
-	// Start with the defaultVTuberSoftware.
-	twitchConfigs.VTuberSoftware = defaultVTuberSoftware
+	// Set VTuberSoftware based on flag.
+	twitchConfigs.VTuberSoftware = *vtuberSoftware
 
 	// global
 	if globalConfig.GameFound {
