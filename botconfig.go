@@ -66,7 +66,7 @@ type config struct {
 	// Stream Settings
 	StreamTags     []string `json:"streamtags"`
 	TitleSuffix    string   `json:"titlesuffix"`
-	VTuberSoftware string   `json:"vtubersoftware"` // Move to flag so we can set stream tags.
+	VTuberSoftware string   `json:"vtubersoftware"`
 	// Model Options
 	VNyanOutfit string `json:"vnyanoutfit"`
 	// Overlays
