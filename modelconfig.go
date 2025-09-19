@@ -58,7 +58,6 @@ type config struct {
 	PeltThePanda  bool `json:"peltthepanda"`
 	PieDrop       bool `json:"piedrop"`
 	PostItRed     bool `json:"postitred"`
-	RandomOutfit  bool `json:"randomoutfit"`
 	RedInABox     bool `json:"redinabox"`
 	RentThisHat   bool `json:"rentthishat"`
 	SpinThePanda  bool `json:"spinthepanda"`
