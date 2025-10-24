@@ -69,7 +69,7 @@ type config struct {
 	ToughLove     bool `json:"toughlove"`
 }
 
-func newConfig() config {
+func newConfig() *config {
 	// By default we start with all bools as true then override to false.
 	config := config{}
 
@@ -81,6 +81,11 @@ func newConfig() config {
 	}
 
 	r := reflect.ValueOf(config)
+
+	// Derefrence the pointer.
+	if r.Kind() == reflect.Ptr {
+		r = r.Elem()
+	}
 
 	// There's probably a better way to do this but I'm lazy right now.
 	for i := range r.NumField() {
@@ -97,7 +102,7 @@ func newConfig() config {
 		)
 	}
 
-	return config
+	return &config
 }
 
 func getBool(c config, field string) bool {
@@ -106,14 +111,13 @@ func getBool(c config, field string) bool {
 }
 
 func resolveBool(a config, b config, field string) bool {
-	if getBool(newConfig(), field) {
+	if getBool(*newConfig(), field) {
 		return getBool(a, field) && getBool(b, field)
 	}
 	return getBool(a, field) || getBool(b, field)
 }
 
-func readFromFile(f string) config {
-	c := newConfig()
+func (c *config) readFromFile(f string) {
 	c.ConfigFound = true
 	configFile, err := os.Open(f)
 	if err != nil {
@@ -123,10 +127,9 @@ func readFromFile(f string) config {
 	defer configFile.Close()
 	jsonParser := json.NewDecoder(configFile)
 	jsonParser.Decode(&c)
-	return c
 }
 
-func writeToFile(f string, c config) {
+func (c *config) writeToFile(f string) {
 	// Write the merged data to a new JSON file.
 	outputFile, err := os.Create(f)
 	if err != nil {
@@ -147,7 +150,7 @@ func writeToFile(f string, c config) {
 	w.Flush()
 }
 
-func mergeConfigs(o config, n config) config {
+func (c *config) mergeConfigs(n config) {
 
 	// Keep include processing first!
 	// Reason being to have original take precedent over the include.
@@ -157,11 +160,12 @@ func mergeConfigs(o config, n config) config {
 		// Skip if we've read this file before.
 		if !includesSeen[includeFile] {
 			includesSeen[includeFile] = true
-			i := readFromFile(includeFile)
+			i := newConfig()
+			i.readFromFile(includeFile)
 
 			if i.ConfigFound {
 				slog.Debug("    Inlcuded " + n.Include + " configs...")
-				o = mergeConfigs(o, i)
+				c.mergeConfigs(*i)
 			}
 		} else {
 			slog.Debug("    Already seen " + n.Include + " in another config...")
@@ -171,7 +175,12 @@ func mergeConfigs(o config, n config) config {
 	// Pull all bools from config struct to resolve them.
 	boolsToResolve := []string{}
 
-	r := reflect.ValueOf(o)
+	r := reflect.ValueOf(c)
+
+	// Derefrence the pointer.
+	if r.Kind() == reflect.Ptr {
+		r = r.Elem()
+	}
 
 	for i := range r.NumField() {
 		if r.Field(i).Kind() == reflect.Bool {
@@ -180,21 +189,19 @@ func mergeConfigs(o config, n config) config {
 	}
 
 	for _, f := range boolsToResolve {
-		reflect.ValueOf(&o).Elem().FieldByName(f).SetBool(
-			resolveBool(o, n, f),
+		reflect.ValueOf(c).Elem().FieldByName(f).SetBool(
+			resolveBool(*c, n, f),
 		)
 	}
 
 	// Export which software we've selected.
 	// I assume this could be useful. At least for troubleshooting.
 	if n.Software != "" {
-		o.Software = n.Software
+		c.Software = n.Software
 	}
-
-	return o
 }
 
-func applyOverrides(c config) config {
+func (c *config) applyOverrides() {
 	// Values that don't need to be passed into StreamerBot.
 	c.Include = ""
 
@@ -204,6 +211,11 @@ func applyOverrides(c config) config {
 		allBools := []string{}
 
 		r := reflect.ValueOf(c)
+
+		// Derefrence the pointer.
+		if r.Kind() == reflect.Ptr {
+			r = r.Elem()
+		}
 
 		// There's probably a better way to do this but I'm lazy right now.
 		for i := range r.NumField() {
@@ -218,8 +230,6 @@ func applyOverrides(c config) config {
 			)
 		}
 	}
-
-	return c
 }
 
 func sanitizeModelFileName(f string) string {
@@ -244,6 +254,11 @@ func writeSchemaFile() {
 	}
 
 	r := reflect.ValueOf(config)
+
+	// Derefrence the pointer.
+	if r.Kind() == reflect.Ptr {
+		r = r.Elem()
+	}
 
 	for i := range r.NumField() {
 		n := strings.ToLower(r.Type().Field(i).Name)
@@ -307,7 +322,8 @@ func main() {
 
 	// Read the JSON files into data structures.
 	slog.Debug("Reading configs...")
-	modelConfig := readFromFile(modelFileName)
+	modelConfig := newConfig()
+	modelConfig.readFromFile(modelFileName)
 
 	// Combine the JSON files with preference for gameConfig.
 	// Included/Nested configs will be recursed during each merge.
@@ -317,14 +333,14 @@ func main() {
 	// global
 	if modelConfig.ConfigFound {
 		slog.Debug("  Model configs...")
-		config = mergeConfigs(config, modelConfig)
+		config.mergeConfigs(*modelConfig)
 	}
 
 	// Set ConfigFound to model's setting before we apply overrides.
 	config.ConfigFound = modelConfig.ConfigFound
 
 	// Apply overrides.
-	config = applyOverrides(config)
+	config.applyOverrides()
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
@@ -333,7 +349,7 @@ func main() {
 	// Write to output file.
 	if *writeJSONFile {
 		slog.Debug("Writing JSON file...")
-		writeToFile(*outFile, config)
+		config.writeToFile(*outFile)
 	}
 
 	// Write out JSON.
