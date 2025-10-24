@@ -46,11 +46,12 @@ type config struct {
 	GameName  string `json:"gamename"`
 }
 
-func newConfig() config {
+func newConfig() *config {
 	// For setting non-standard default values.
-	return config{
+	return &config{
 		// Especially any booleans that default to true.
 		// Or strings that should have a dafault value.
+		GameFound: true,
 	}
 }
 
@@ -60,15 +61,13 @@ func getBool(c config, field string) bool {
 }
 
 func resolveBool(a config, b config, field string) bool {
-	if getBool(newConfig(), field) {
+	if getBool(*newConfig(), field) {
 		return getBool(a, field) && getBool(b, field)
 	}
 	return getBool(a, field) || getBool(b, field)
 }
 
-func readFromFile(f string) config {
-	c := newConfig()
-	c.GameFound = true
+func (c *config) readFromFile(f string) {
 	configFile, err := os.Open(f)
 	if err != nil {
 		slog.Debug("Error loading config:", err.Error(), err)
@@ -77,10 +76,9 @@ func readFromFile(f string) config {
 	defer configFile.Close()
 	jsonParser := json.NewDecoder(configFile)
 	jsonParser.Decode(&c)
-	return c
 }
 
-func writeToFile(f string, c config) {
+func (c *config) writeToFile(f string) {
 	// Write the merged data to a new JSON file.
 	outputFile, err := os.Create(f)
 	if err != nil {
@@ -113,10 +111,10 @@ func removeDuplicateStr(strSlice []string) []string {
 	return list
 }
 
-func mergeConfigs(o config, n config) config {
+func (c *config) mergeConfigs(n config) {
 	// Merge StreamTags
-	o.StreamTags = removeDuplicateStr(
-		append(o.StreamTags, n.StreamTags...),
+	c.StreamTags = removeDuplicateStr(
+		append(c.StreamTags, n.StreamTags...),
 	)
 
 	// Keep include processing first!
@@ -127,11 +125,12 @@ func mergeConfigs(o config, n config) config {
 		// Skip if we've read this file before.
 		if !includesSeen[includeFile] {
 			includesSeen[includeFile] = true
-			i := readFromFile(includeFile)
+			i := newConfig()
+			i.readFromFile(includeFile)
 
 			if i.GameFound {
 				slog.Debug("    Inlcuded " + n.Include + " configs...")
-				o = mergeConfigs(o, i)
+				c.mergeConfigs(*i)
 			}
 		} else {
 			slog.Debug("    Already seen " + n.Include + " in another config...")
@@ -139,13 +138,18 @@ func mergeConfigs(o config, n config) config {
 	}
 
 	if n.TitleSuffix != "" {
-		o.TitleSuffix = n.TitleSuffix
+		c.TitleSuffix = n.TitleSuffix
 	}
 
 	// Pull all bools from config struct to resolve them.
 	boolsToResolve := []string{}
 
-	r := reflect.ValueOf(o)
+	r := reflect.ValueOf(c)
+
+	// Derefrence the pointer.
+	if r.Kind() == reflect.Ptr {
+		r = r.Elem()
+	}
 
 	for i := range r.NumField() {
 		if r.Field(i).Kind() == reflect.Bool {
@@ -154,15 +158,13 @@ func mergeConfigs(o config, n config) config {
 	}
 
 	for _, f := range boolsToResolve {
-		reflect.ValueOf(&o).Elem().FieldByName(f).SetBool(
-			resolveBool(o, n, f),
+		reflect.ValueOf(c).Elem().FieldByName(f).SetBool(
+			resolveBool(*c, n, f),
 		)
 	}
-
-	return o
 }
 
-func applyOverrides(c config) config {
+func (c *config) applyOverrides() {
 	// Values that don't need to be passed into StreamerBot.
 	c.Include = ""
 
@@ -176,8 +178,6 @@ func applyOverrides(c config) config {
 
 	// Set GameName to passed in value.
 	c.GameName = *game
-
-	return c
 }
 
 func sanitizeGame(s string) string {
@@ -229,13 +229,20 @@ func main() {
 	dateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
 	yeardateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, yeardate)
 
+	// Defining structs
+	globalConfig := newConfig()
+	gameConfig := newConfig()
+	dayConfig := newConfig()
+	dateConfig := newConfig()
+	yeardateConfig := newConfig()
+
 	// Read the JSON files into data structures.
 	slog.Debug("Reading configs...")
-	globalConfig := readFromFile(globalFile)
-	gameConfig := readFromFile(gameFile)
-	dayConfig := readFromFile(dayFile)
-	dateConfig := readFromFile(dateFile)
-	yeardateConfig := readFromFile(yeardateFile)
+	globalConfig.readFromFile(globalFile)
+	gameConfig.readFromFile(gameFile)
+	dayConfig.readFromFile(dayFile)
+	dateConfig.readFromFile(dateFile)
+	yeardateConfig.readFromFile(yeardateFile)
 
 	// Combine the JSON files with preference for gameConfig.
 	// Included/Nested configs will be recursed during each merge.
@@ -245,13 +252,13 @@ func main() {
 	// global
 	if globalConfig.GameFound {
 		slog.Debug("  Global configs...")
-		twitchConfigs = mergeConfigs(twitchConfigs, globalConfig)
+		twitchConfigs.mergeConfigs(*globalConfig)
 	}
 
 	// game
 	if gameConfig.GameFound {
 		slog.Debug("  Game configs...")
-		twitchConfigs = mergeConfigs(twitchConfigs, gameConfig)
+		twitchConfigs.mergeConfigs(*gameConfig)
 	} else {
 		// If we don't find the game file then add the defaultTags.
 		twitchConfigs.StreamTags = removeDuplicateStr(
@@ -262,23 +269,23 @@ func main() {
 	// day
 	if dayConfig.GameFound {
 		slog.Debug("  Day configs...")
-		twitchConfigs = mergeConfigs(twitchConfigs, dayConfig)
+		twitchConfigs.mergeConfigs(*dayConfig)
 	}
 
 	// date
 	if dateConfig.GameFound {
 		slog.Debug("  Date configs...")
-		twitchConfigs = mergeConfigs(twitchConfigs, dateConfig)
+		twitchConfigs.mergeConfigs(*dateConfig)
 	}
 
 	// date w/ year
 	if yeardateConfig.GameFound {
 		slog.Debug("  Date w/Year configs...")
-		twitchConfigs = mergeConfigs(twitchConfigs, yeardateConfig)
+		twitchConfigs.mergeConfigs(*yeardateConfig)
 	}
 
 	// Apply overrides.
-	twitchConfigs = applyOverrides(twitchConfigs)
+	twitchConfigs.applyOverrides()
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
@@ -287,7 +294,7 @@ func main() {
 	// Write to output file.
 	if *writeJSONFile {
 		slog.Debug("Writing JSON file...")
-		writeToFile(*outFile, twitchConfigs)
+		twitchConfigs.writeToFile(*outFile)
 	}
 
 	// Write out JSON.
