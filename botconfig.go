@@ -67,7 +67,9 @@ func resolveBool(a config, b config, field string) bool {
 	return getBool(a, field) || getBool(b, field)
 }
 
-func (c *config) readFromFile(f string) {
+func readFromFile(f string) *config {
+	c := newConfig()
+
 	configFile, err := os.Open(f)
 	if err != nil {
 		slog.Debug("Error loading config:", err.Error(), err)
@@ -76,6 +78,8 @@ func (c *config) readFromFile(f string) {
 	defer configFile.Close()
 	jsonParser := json.NewDecoder(configFile)
 	jsonParser.Decode(&c)
+
+	return c
 }
 
 func (c *config) writeToFile(f string) {
@@ -125,8 +129,7 @@ func (c *config) mergeConfigs(n config) {
 		// Skip if we've read this file before.
 		if !includesSeen[includeFile] {
 			includesSeen[includeFile] = true
-			i := newConfig()
-			i.readFromFile(includeFile)
+			i := readFromFile(includeFile)
 
 			if i.GameFound {
 				slog.Debug("    Inlcuded " + n.Include + " configs...")
@@ -209,16 +212,26 @@ func main() {
 	if len(*dayOverride) > 0 {
 		weekday = *dayOverride
 	}
-	slog.Debug("Today is " + weekday + "...")
 
-	// Grab today's date in <Month>-<Day> format.
-	date := fmt.Sprintf(time.Now().Month().String() + "-" + strconv.Itoa(time.Now().Day()))
+	// Grab base date items.
+	day := strconv.Itoa(time.Now().Day())
+	month := fmt.Sprintf(time.Now().Month().String())
+	year := strconv.Itoa(time.Now().Year())
+
+	// Build cobination date items.
+	date := fmt.Sprintf(month + "-" + day)
 	if len(*dateOverride) > 0 {
 		date = *dateOverride
 	}
+	dateYear := fmt.Sprintf(date + "-" + year)
+	monthYear := fmt.Sprintf(month + "-" + year)
+
+	// Print everything for debugging.
+	slog.Debug("Today is " + weekday + "...")
 	slog.Debug("Date is " + date + "...")
-	yeardate := fmt.Sprintf(date + "-" + strconv.Itoa(time.Now().Year()))
-	slog.Debug("Date w/Year is " + yeardate + "...")
+	slog.Debug("Date w/Year is " + dateYear + "...")
+	slog.Debug("Month is " + month + "...")
+	slog.Debug("Month w/Year is " + monthYear + "...")
 
 	saneGame := sanitizeGame(*game)
 
@@ -227,22 +240,19 @@ func main() {
 	gameFile := fmt.Sprintf("%sgames\\%s.json", *configRoot, saneGame)
 	dayFile := fmt.Sprintf("%sday\\%s.json", *configRoot, weekday)
 	dateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
-	yeardateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, yeardate)
-
-	// Defining structs
-	globalConfig := newConfig()
-	gameConfig := newConfig()
-	dayConfig := newConfig()
-	dateConfig := newConfig()
-	yeardateConfig := newConfig()
+	dateYearFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
+	monthFile := fmt.Sprintf("%smonth\\%s.json", *configRoot, month)
+	monthYearFile := fmt.Sprintf("%smonth\\%s.json", *configRoot, monthYear)
 
 	// Read the JSON files into data structures.
 	slog.Debug("Reading configs...")
-	globalConfig.readFromFile(globalFile)
-	gameConfig.readFromFile(gameFile)
-	dayConfig.readFromFile(dayFile)
-	dateConfig.readFromFile(dateFile)
-	yeardateConfig.readFromFile(yeardateFile)
+	globalConfig := readFromFile(globalFile)
+	gameConfig := readFromFile(gameFile)
+	dayConfig := readFromFile(dayFile)
+	dateConfig := readFromFile(dateFile)
+	dateYearConfig := readFromFile(dateYearFile)
+	monthConfig := readFromFile(monthFile)
+	monthYearConfig := readFromFile(monthYearFile)
 
 	// Combine the JSON files with preference for gameConfig.
 	// Included/Nested configs will be recursed during each merge.
@@ -279,9 +289,21 @@ func main() {
 	}
 
 	// date w/ year
-	if yeardateConfig.GameFound {
+	if dateYearConfig.GameFound {
 		slog.Debug("  Date w/Year configs...")
-		twitchConfigs.mergeConfigs(*yeardateConfig)
+		twitchConfigs.mergeConfigs(*dateYearConfig)
+	}
+
+	// month
+	if monthConfig.GameFound {
+		slog.Debug("  Month configs...")
+		twitchConfigs.mergeConfigs(*monthConfig)
+	}
+
+	// month w/ year
+	if monthYearConfig.GameFound {
+		slog.Debug("  Month w/Year configs...")
+		twitchConfigs.mergeConfigs(*monthYearConfig)
 	}
 
 	// Apply overrides.
