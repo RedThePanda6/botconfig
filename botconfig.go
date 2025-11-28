@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -75,10 +76,12 @@ type config struct {
 	GamePad       bool   `json:"gamepad"`
 	OrpaxMemorial bool   `json:"orpaxmemorial"`
 	PandaSign     string `json:"pandasign"`
+	Streamathon   bool   `json:"streamathon"`
 	Uptime        bool   `json:"uptime"`
 	// Other Functions
-	OutfitPoll   bool `json:"outfitpoll"`
-	SongRequests bool `json:"songrequests"`
+	OutfitPoll    bool     `json:"outfitpoll"`
+	SongRequests  bool     `json:"songrequests"`
+	Collaborators []string `json:"collaborators"`
 	// Rewards
 	BambooRequestCost int  `json:"bamboorequestcost"`
 	BedTime           bool `json:"bedtime"`
@@ -138,7 +141,9 @@ func resolveBool(a config, b config, field string) bool {
 	return getBool(a, field) || getBool(b, field)
 }
 
-func (c *config) readFromFile(f string) {
+func readFromFile(f string) *config {
+	c := newConfig()
+
 	configFile, err := os.Open(f)
 	if err != nil {
 		slog.Debug("Error loading config:", err.Error(), err)
@@ -147,6 +152,8 @@ func (c *config) readFromFile(f string) {
 	defer configFile.Close()
 	jsonParser := json.NewDecoder(configFile)
 	jsonParser.Decode(&c)
+
+	return c
 }
 
 func (c *config) writeToFile(f string) {
@@ -188,6 +195,11 @@ func (c *config) mergeConfigs(n config) {
 		append(c.StreamTags, n.StreamTags...),
 	)
 
+	// Merge Collaborators
+	c.Collaborators = removeDuplicateStr(
+		append(c.Collaborators, n.Collaborators...),
+	)
+
 	// Keep include processing first!
 	// Reason being to have original take precedent over the include.
 	// (Last config applied wins.)
@@ -196,8 +208,7 @@ func (c *config) mergeConfigs(n config) {
 		// Skip if we've read this file before.
 		if !includesSeen[includeFile] {
 			includesSeen[includeFile] = true
-			i := newConfig()
-			i.readFromFile(includeFile)
+			i := readFromFile(includeFile)
 
 			if i.GameFound {
 				slog.Debug("    Inlcuded " + n.Include + " configs...")
@@ -216,8 +227,13 @@ func (c *config) mergeConfigs(n config) {
 		}
 	}
 
+	// Let's try appending TitleSuffix to see how scuffed this gets.
 	if n.TitleSuffix != "" {
-		c.TitleSuffix = n.TitleSuffix
+		if len(c.TitleSuffix) > 0 {
+			c.TitleSuffix = fmt.Sprintf(c.TitleSuffix + " | " + n.TitleSuffix)
+		} else {
+			c.TitleSuffix = n.TitleSuffix
+		}
 	}
 
 	if n.NotifyInterval < c.NotifyInterval {
@@ -371,6 +387,11 @@ func writeSchemaFile() {
 	f := *schemaFile
 	config := newConfig()
 
+	stringArrays := []string{
+		"streamtags",
+		"collaborators",
+	}
+
 	// Handle properties separately.
 	properties := make(map[string]any)
 	// Special cases or properties outside of struct.
@@ -380,11 +401,13 @@ func writeSchemaFile() {
 	properties["$schema"] = map[string]any{
 		"type": "string",
 	}
-	properties["streamtags"] = map[string]any{
-		"type": "array",
-		"items": []map[string]any{
-			{"type": "string"},
-		},
+	for _, v := range stringArrays {
+		properties[v] = map[string]any{
+			"type": "array",
+			"items": []map[string]any{
+				{"type": "string"},
+			},
+		}
 	}
 
 	r := reflect.ValueOf(config)
@@ -397,7 +420,7 @@ func writeSchemaFile() {
 	for i := range r.NumField() {
 		n := strings.ToLower(r.Type().Field(i).Name)
 		// streamtags are handled specially.
-		if n == "streamtags" {
+		if slices.Contains(stringArrays, n) {
 			continue
 		}
 
@@ -462,16 +485,26 @@ func main() {
 	if len(*dayOverride) > 0 {
 		weekday = *dayOverride
 	}
-	slog.Debug("Today is " + weekday + "...")
 
-	// Grab today's date in <Month>-<Day> format.
-	date := fmt.Sprintf(time.Now().Month().String() + "-" + strconv.Itoa(time.Now().Day()))
+	// Grab base date items.
+	day := strconv.Itoa(time.Now().Day())
+	month := fmt.Sprintf(time.Now().Month().String())
+	year := strconv.Itoa(time.Now().Year())
+
+	// Build cobination date items.
+	date := fmt.Sprintf(month + "-" + day)
 	if len(*dateOverride) > 0 {
 		date = *dateOverride
 	}
+	dateYear := fmt.Sprintf(date + "-" + year)
+	monthYear := fmt.Sprintf(month + "-" + year)
+
+	// Print everything for debugging.
+	slog.Debug("Today is " + weekday + "...")
 	slog.Debug("Date is " + date + "...")
-	yeardate := fmt.Sprintf(date + "-" + strconv.Itoa(time.Now().Year()))
-	slog.Debug("Date w/Year is " + yeardate + "...")
+	slog.Debug("Date w/Year is " + dateYear + "...")
+	slog.Debug("Month is " + month + "...")
+	slog.Debug("Month w/Year is " + monthYear + "...")
 
 	saneGame := sanitizeGame(*game)
 
@@ -480,22 +513,19 @@ func main() {
 	gameFile := fmt.Sprintf("%sgames\\%s.json", *configRoot, saneGame)
 	dayFile := fmt.Sprintf("%sday\\%s.json", *configRoot, weekday)
 	dateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
-	yeardateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, yeardate)
-
-	// Defining structs
-	globalConfig := newConfig()
-	gameConfig := newConfig()
-	dayConfig := newConfig()
-	dateConfig := newConfig()
-	yeardateConfig := newConfig()
+	dateYearFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
+	monthFile := fmt.Sprintf("%smonth\\%s.json", *configRoot, month)
+	monthYearFile := fmt.Sprintf("%smonth\\%s.json", *configRoot, monthYear)
 
 	// Read the JSON files into data structures.
 	slog.Debug("Reading configs...")
-	globalConfig.readFromFile(globalFile)
-	gameConfig.readFromFile(gameFile)
-	dayConfig.readFromFile(dayFile)
-	dateConfig.readFromFile(dateFile)
-	yeardateConfig.readFromFile(yeardateFile)
+	globalConfig := readFromFile(globalFile)
+	gameConfig := readFromFile(gameFile)
+	dayConfig := readFromFile(dayFile)
+	dateConfig := readFromFile(dateFile)
+	dateYearConfig := readFromFile(dateYearFile)
+	monthConfig := readFromFile(monthFile)
+	monthYearConfig := readFromFile(monthYearFile)
 
 	// Combine the JSON files with preference for gameConfig.
 	// Included/Nested configs will be recursed during each merge.
@@ -534,9 +564,21 @@ func main() {
 	}
 
 	// date w/ year
-	if yeardateConfig.GameFound {
+	if dateYearConfig.GameFound {
 		slog.Debug("  Date w/Year configs...")
-		twitchConfigs.mergeConfigs(*yeardateConfig)
+		twitchConfigs.mergeConfigs(*dateYearConfig)
+	}
+
+	// month
+	if monthConfig.GameFound {
+		slog.Debug("  Month configs...")
+		twitchConfigs.mergeConfigs(*monthConfig)
+	}
+
+	// month w/ year
+	if monthYearConfig.GameFound {
+		slog.Debug("  Month w/Year configs...")
+		twitchConfigs.mergeConfigs(*monthYearConfig)
 	}
 
 	// Apply overrides.
