@@ -59,6 +59,12 @@ var (
 		"VTS":       true,
 	}
 	defaultVTuberSoftware = "VNyan"
+	// This is absolutely horrible and I don't like it. We want to ultimately pass
+	// out that we have a special present in the configs. But, we don't want to
+	// have the special price passed between config sets because then we get
+	// unintended behaviors. So we use this global value to detect if a special is
+	// running and then re-set the flag as part of the final overrides.
+	bambooSpecialPresent = false
 )
 
 type config struct {
@@ -84,14 +90,11 @@ type config struct {
 	Collaborators []string `json:"collaborators"`
 	// Rewards
 	BambooRequestCost int  `json:"bamboorequestcost"`
-	BedTime           bool `json:"bedtime"`
-	ChosenOne         bool `json:"chosenone"`
-	CreepyTime        bool `json:"creepytime"`
+	BambooSpecial     bool `json:"bamboospecial"`
 	JibberJabbey      bool `json:"jibberjabbey"`
 	LPGameCost        int  `json:"lpgamecost"`
 	LPTalkingCost     int  `json:"lptalkingcost"`
 	NameAThing        bool `json:"nameathing"`
-	NoBeanie          bool `json:"nobeanie"`
 	RaidRoulette      bool `json:"raidroulette"`
 	// Commands
 	// Bot Functions
@@ -115,7 +118,6 @@ func newConfig() *config {
 	// For setting non-standard default values.
 	return &config{
 		BambooRequestCost: 20,
-		ChosenOne:         true,
 		GameFound:         true,
 		JibberJabbey:      true,
 		LPGameCost:        defaultLPGameCost,
@@ -252,6 +254,11 @@ func (c *config) mergeConfigs(n config) {
 		c.EndMinute = n.EndMinute
 	}
 
+	// Special values that we don't want to carry over between config sets.
+	boolsToNotResolve := []string{
+		"BambooSpecial",
+	}
+
 	// Pull all bools from config struct to resolve them.
 	boolsToResolve := []string{}
 
@@ -264,7 +271,11 @@ func (c *config) mergeConfigs(n config) {
 
 	for i := range r.NumField() {
 		if r.Field(i).Kind() == reflect.Bool {
-			boolsToResolve = append(boolsToResolve, r.Type().Field(i).Name)
+			fieldName := r.Type().Field(i).Name
+			if slices.Contains(boolsToNotResolve, fieldName) {
+				continue
+			}
+			boolsToResolve = append(boolsToResolve, fieldName)
 		}
 	}
 
@@ -291,10 +302,31 @@ func (c *config) mergeConfigs(n config) {
 	}
 
 	// Bamboo Request Cost
-	// Go with whichever is higher.
-	if n.BambooRequestCost > c.BambooRequestCost {
-		c.BambooRequestCost = n.BambooRequestCost
+	// This section is functional but ugly. I should figure out a more logical way
+	// of doing this.
+	if bambooSpecialPresent {
+		slog.Debug("    Skipping normal Bamboo cost due to special.")
+	} else {
+		// Go with whichever is higher.
+		if n.BambooRequestCost > c.BambooRequestCost {
+			c.BambooRequestCost = n.BambooRequestCost
+		}
 	}
+	// Unless it's a Special then go with lower.
+	// And while we're here we set the global boolean for use later.
+	if n.BambooSpecial {
+		slog.Debug("    Bamboo special detected!")
+		// Debug warning if multiple specials are running at the same.
+		if bambooSpecialPresent {
+			slog.Debug("WARNING!! Multiple Bamboo specials running at the same time.")
+			slog.Debug("This can lead to unintended prices if you're not careful.")
+		}
+		bambooSpecialPresent = true
+		if n.BambooRequestCost < c.BambooRequestCost {
+			c.BambooRequestCost = n.BambooRequestCost
+		}
+	}
+	// End Bamboo Request Cost
 }
 
 func (c *config) applyOverrides() {
@@ -320,7 +352,6 @@ func (c *config) applyOverrides() {
 		c.VNyanOutfit = ""
 
 		// Disable incompatible redeems.
-		c.NoBeanie = false
 
 	// VTube Studio Settings
 	case "VTS":
@@ -333,7 +364,6 @@ func (c *config) applyOverrides() {
 		c.VNyanOutfit = ""
 
 		// Disable incompatible redeems.
-		c.NoBeanie = false
 
 	// VNyan Settings
 	case "VNyan":
@@ -347,7 +377,6 @@ func (c *config) applyOverrides() {
 		}
 
 		// Disable incompatible redeems.
-		c.NoBeanie = false
 
 	// Facecam Settings
 	case "None":
@@ -365,11 +394,13 @@ func (c *config) applyOverrides() {
 	// Set GameName to passed in value.
 	c.GameName = *game
 
+	// Silly hack in order to correctly pass back if we're running a special on
+	// BambooRequestCost.
+	c.BambooSpecial = bambooSpecialPresent
+
 	// Oncall overrides.
 	if *onCall || c.OnCall {
 		c.OnCall = true
-		c.BedTime = false
-		c.CreepyTime = false
 		c.RaidRoulette = false
 	}
 }
@@ -501,10 +532,10 @@ func main() {
 
 	// Print everything for debugging.
 	slog.Debug("Today is " + weekday + "...")
-	slog.Debug("Date is " + date + "...")
-	slog.Debug("Date w/Year is " + dateYear + "...")
 	slog.Debug("Month is " + month + "...")
 	slog.Debug("Month w/Year is " + monthYear + "...")
+	slog.Debug("Date is " + date + "...")
+	slog.Debug("Date w/Year is " + dateYear + "...")
 
 	saneGame := sanitizeGame(*game)
 
@@ -512,20 +543,20 @@ func main() {
 	globalFile := fmt.Sprintf("%sglobal.json", *configRoot)
 	gameFile := fmt.Sprintf("%sgames\\%s.json", *configRoot, saneGame)
 	dayFile := fmt.Sprintf("%sday\\%s.json", *configRoot, weekday)
-	dateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
-	dateYearFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
 	monthFile := fmt.Sprintf("%smonth\\%s.json", *configRoot, month)
 	monthYearFile := fmt.Sprintf("%smonth\\%s.json", *configRoot, monthYear)
+	dateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
+	dateYearFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, dateYear)
 
 	// Read the JSON files into data structures.
 	slog.Debug("Reading configs...")
 	globalConfig := readFromFile(globalFile)
 	gameConfig := readFromFile(gameFile)
 	dayConfig := readFromFile(dayFile)
-	dateConfig := readFromFile(dateFile)
-	dateYearConfig := readFromFile(dateYearFile)
 	monthConfig := readFromFile(monthFile)
 	monthYearConfig := readFromFile(monthYearFile)
+	dateConfig := readFromFile(dateFile)
+	dateYearConfig := readFromFile(dateYearFile)
 
 	// Combine the JSON files with preference for gameConfig.
 	// Included/Nested configs will be recursed during each merge.
@@ -557,18 +588,6 @@ func main() {
 		twitchConfigs.mergeConfigs(*dayConfig)
 	}
 
-	// date
-	if dateConfig.GameFound {
-		slog.Debug("  Date configs...")
-		twitchConfigs.mergeConfigs(*dateConfig)
-	}
-
-	// date w/ year
-	if dateYearConfig.GameFound {
-		slog.Debug("  Date w/Year configs...")
-		twitchConfigs.mergeConfigs(*dateYearConfig)
-	}
-
 	// month
 	if monthConfig.GameFound {
 		slog.Debug("  Month configs...")
@@ -579,6 +598,18 @@ func main() {
 	if monthYearConfig.GameFound {
 		slog.Debug("  Month w/Year configs...")
 		twitchConfigs.mergeConfigs(*monthYearConfig)
+	}
+
+	// date
+	if dateConfig.GameFound {
+		slog.Debug("  Date configs...")
+		twitchConfigs.mergeConfigs(*dateConfig)
+	}
+
+	// date w/ year
+	if dateYearConfig.GameFound {
+		slog.Debug("  Date w/Year configs...")
+		twitchConfigs.mergeConfigs(*dateYearConfig)
 	}
 
 	// Apply overrides.
