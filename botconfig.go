@@ -540,23 +540,14 @@ func main() {
 	saneGame := sanitizeGame(*game)
 
 	// Set the names of the JSON files to merge.
+	// Process Global and Game specially. All others in order.
 	globalFile := fmt.Sprintf("%sglobal.json", *configRoot)
 	gameFile := fmt.Sprintf("%sgames\\%s.json", *configRoot, saneGame)
-	dayFile := fmt.Sprintf("%sday\\%s.json", *configRoot, weekday)
-	monthFile := fmt.Sprintf("%smonth\\%s.json", *configRoot, month)
-	monthYearFile := fmt.Sprintf("%smonth\\%s.json", *configRoot, monthYear)
-	dateFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, date)
-	dateYearFile := fmt.Sprintf("%sdate\\%s.json", *configRoot, dateYear)
 
 	// Read the JSON files into data structures.
 	slog.Debug("Reading configs...")
 	globalConfig := readFromFile(globalFile)
 	gameConfig := readFromFile(gameFile)
-	dayConfig := readFromFile(dayFile)
-	monthConfig := readFromFile(monthFile)
-	monthYearConfig := readFromFile(monthYearFile)
-	dateConfig := readFromFile(dateFile)
-	dateYearConfig := readFromFile(dateYearFile)
 
 	// Combine the JSON files with preference for gameConfig.
 	// Included/Nested configs will be recursed during each merge.
@@ -582,34 +573,21 @@ func main() {
 		)
 	}
 
-	// day
-	if dayConfig.GameFound {
-		slog.Debug("  Day configs...")
-		twitchConfigs.mergeConfigs(*dayConfig)
+	// And now we load all the day/date/whatever specific configs.
+	configFiles := []string{
+		fmt.Sprintf("%sday\\%s.json", *configRoot, weekday),
+		fmt.Sprintf("%smonth\\%s.json", *configRoot, month),
+		fmt.Sprintf("%smonth\\%s.json", *configRoot, monthYear),
+		fmt.Sprintf("%sdate\\%s.json", *configRoot, date),
+		fmt.Sprintf("%sdate\\%s.json", *configRoot, dateYear),
 	}
 
-	// month
-	if monthConfig.GameFound {
-		slog.Debug("  Month configs...")
-		twitchConfigs.mergeConfigs(*monthConfig)
-	}
-
-	// month w/ year
-	if monthYearConfig.GameFound {
-		slog.Debug("  Month w/Year configs...")
-		twitchConfigs.mergeConfigs(*monthYearConfig)
-	}
-
-	// date
-	if dateConfig.GameFound {
-		slog.Debug("  Date configs...")
-		twitchConfigs.mergeConfigs(*dateConfig)
-	}
-
-	// date w/ year
-	if dateYearConfig.GameFound {
-		slog.Debug("  Date w/Year configs...")
-		twitchConfigs.mergeConfigs(*dateYearConfig)
+	for _, file := range configFiles {
+		slog.Debug("  " + file)
+		config := readFromFile(file)
+		if config.GameFound {
+			twitchConfigs.mergeConfigs(*config)
+		}
 	}
 
 	// Apply overrides.
