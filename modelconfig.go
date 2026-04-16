@@ -44,6 +44,7 @@ type config struct {
 	ConfigFound   bool   `json:"configfound"`
 	ModelFileName string `json:"modelfilename"`
 	Software      string `json:"software"`
+	Camera        int    `json:"camera"`
 	// Redeems
 	AnvilDrop     bool `json:"anvildrop"`
 	ASCIIRed      bool `json:"asciired"`
@@ -71,7 +72,9 @@ type config struct {
 
 func newConfig() *config {
 	// By default we start with all bools as true then override to false.
-	config := config{}
+	config := config{
+		Camera: 0,
+	}
 
 	allBools := []string{}
 
@@ -198,6 +201,11 @@ func (c *config) mergeConfigs(n config) {
 	// I assume this could be useful. At least for troubleshooting.
 	if n.Software != "" {
 		c.Software = n.Software
+	}
+
+	// If Camera is different from default...
+	if n.Camera != newConfig().Camera {
+		c.Camera = n.Camera
 	}
 }
 
