@@ -72,40 +72,27 @@ type config struct {
 
 func newConfig() *config {
 	// By default we start with all bools as true then override to false.
-	config := config{
+	config := &config{
 		Camera: 0,
 	}
-
-	allBools := []string{}
 
 	// Bools that need to be false for reasons.
 	controlBools := []string{
 		"ConfigFound",
 	}
 
-	r := reflect.ValueOf(config)
+	r := reflect.ValueOf(config).Elem()
 
-	// Derefrence the pointer.
-	if r.Kind() == reflect.Ptr {
-		r = r.Elem()
-	}
-
-	// There's probably a better way to do this but I'm lazy right now.
-	for i := range r.NumField() {
-		if r.Field(i).Kind() == reflect.Bool {
-			if !(slices.Contains(controlBools, r.Type().Field(i).Name)) {
-				allBools = append(allBools, r.Type().Field(i).Name)
+	for i := 0; i < r.NumField(); i++ {
+		if !(slices.Contains(controlBools, r.Type().Field(i).Name)) {
+			field := r.Field(i)
+			if field.Kind() == reflect.Bool && field.CanSet() {
+				field.SetBool(true)
 			}
 		}
 	}
 
-	for _, f := range allBools {
-		reflect.ValueOf(&config).Elem().FieldByName(f).SetBool(
-			true,
-		)
-	}
-
-	return &config
+	return config
 }
 
 func getBool(c config, field string) bool {
@@ -178,12 +165,7 @@ func (c *config) mergeConfigs(n config) {
 	// Pull all bools from config struct to resolve them.
 	boolsToResolve := []string{}
 
-	r := reflect.ValueOf(c)
-
-	// Derefrence the pointer.
-	if r.Kind() == reflect.Ptr {
-		r = r.Elem()
-	}
+	r := reflect.ValueOf(c).Elem()
 
 	for i := range r.NumField() {
 		if r.Field(i).Kind() == reflect.Bool {
@@ -216,26 +198,13 @@ func (c *config) applyOverrides() {
 	// No config found means no model is found.
 	// Disable all redeems.
 	if !c.ConfigFound {
-		allBools := []string{}
+		r := reflect.ValueOf(c).Elem()
 
-		r := reflect.ValueOf(c)
-
-		// Derefrence the pointer.
-		if r.Kind() == reflect.Ptr {
-			r = r.Elem()
-		}
-
-		// There's probably a better way to do this but I'm lazy right now.
-		for i := range r.NumField() {
-			if r.Field(i).Kind() == reflect.Bool {
-				allBools = append(allBools, r.Type().Field(i).Name)
+		for i := 0; i < r.NumField(); i++ {
+			field := r.Field(i)
+			if field.Kind() == reflect.Bool && field.CanSet() {
+				field.SetBool(false)
 			}
-		}
-
-		for _, f := range allBools {
-			reflect.ValueOf(&c).Elem().FieldByName(f).SetBool(
-				false,
-			)
 		}
 	}
 }
@@ -261,12 +230,7 @@ func writeSchemaFile() {
 		"type": "string",
 	}
 
-	r := reflect.ValueOf(config)
-
-	// Derefrence the pointer.
-	if r.Kind() == reflect.Ptr {
-		r = r.Elem()
-	}
+	r := reflect.ValueOf(config).Elem()
 
 	for i := range r.NumField() {
 		n := strings.ToLower(r.Type().Field(i).Name)
