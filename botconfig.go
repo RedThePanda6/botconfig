@@ -140,8 +140,13 @@ func (c *config) mergeConfigs(n config) {
 		}
 	}
 
+	// Let's try appending TitleSuffix to see how scuffed this gets.
 	if n.TitleSuffix != "" {
-		c.TitleSuffix = n.TitleSuffix
+		if len(c.TitleSuffix) > 0 {
+			c.TitleSuffix = fmt.Sprintf("%s | %s", c.TitleSuffix, n.TitleSuffix)
+		} else {
+			c.TitleSuffix = n.TitleSuffix
+		}
 	}
 
 	// Pull all bools from config struct to resolve them.
@@ -215,16 +220,16 @@ func main() {
 
 	// Grab base date items.
 	day := strconv.Itoa(time.Now().Day())
-	month := fmt.Sprintf(time.Now().Month().String())
+	month := time.Now().Month().String()
 	year := strconv.Itoa(time.Now().Year())
 
 	// Build cobination date items.
-	date := fmt.Sprintf(month + "-" + day)
+	date := fmt.Sprintf("%s-%s", month, day)
 	if len(*dateOverride) > 0 {
 		date = *dateOverride
 	}
-	dateYear := fmt.Sprintf(date + "-" + year)
-	monthYear := fmt.Sprintf(month + "-" + year)
+	dateYear := fmt.Sprintf("%s-%s", date, year)
+	monthYear := fmt.Sprintf("%s-%s", month, year)
 
 	// Print everything for debugging.
 	slog.Debug("Today is " + weekday + "...")
