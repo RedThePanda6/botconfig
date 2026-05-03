@@ -47,6 +47,7 @@ var (
 	// Mostly as a cheap backstop to prevent a recursive loop of includes.
 	includesSeen = map[string]bool{}
 	// We now set this within StreamerBot based on which programs are running.
+	// But it's still used here to control other flags so we keep it around.
 	vtuberSoftware = flag.String(
 		"vtuberSoftware",
 		defaultVTuberSoftware,
@@ -71,9 +72,9 @@ type config struct {
 	// Includes
 	Include string `json:"include"`
 	// Stream Settings
-	StreamTags     []string `json:"streamtags"`
-	TitleSuffix    string   `json:"titlesuffix"`
-	VTuberSoftware string   `json:"vtubersoftware"`
+	LivePostBluesky string   `json:"livepostbluesky"`
+	StreamTags      []string `json:"streamtags"`
+	TitleSuffix     string   `json:"titlesuffix"`
 	// Model Options
 	VNyanOutfit string `json:"vnyanoutfit"`
 	// Overlays
@@ -221,21 +222,17 @@ func (c *config) mergeConfigs(n config) {
 		}
 	}
 
-	if n.VTuberSoftware != "" {
-		if validVTuberSoftware[n.VTuberSoftware] {
-			c.VTuberSoftware = n.VTuberSoftware
-		} else {
-			slog.Debug("Invalid VTuberSoftware found: " + n.VTuberSoftware)
-		}
-	}
-
 	// Let's try appending TitleSuffix to see how scuffed this gets.
 	if n.TitleSuffix != "" {
 		if len(c.TitleSuffix) > 0 {
-			c.TitleSuffix = fmt.Sprintf(c.TitleSuffix + " | " + n.TitleSuffix)
+			c.TitleSuffix = fmt.Sprintf("%s | %s", c.TitleSuffix, n.TitleSuffix)
 		} else {
 			c.TitleSuffix = n.TitleSuffix
 		}
+	}
+
+	if n.LivePostBluesky != "" {
+		c.LivePostBluesky = n.LivePostBluesky
 	}
 
 	if n.NotifyInterval < c.NotifyInterval {
@@ -333,14 +330,8 @@ func (c *config) applyOverrides() {
 	// Values that don't need to be passed into StreamerBot.
 	c.Include = ""
 
-	// Sanity check the VTuber Software set.
-	if !validVTuberSoftware[c.VTuberSoftware] {
-		slog.Debug("Invalid VTuberSoftware set. Using default: " + defaultVTuberSoftware + ".")
-		c.VTuberSoftware = defaultVTuberSoftware
-	}
-
-	// Apply overrides based on VTuberSoftware.
-	switch c.VTuberSoftware {
+	// Apply overrides based on VTuberSoftware passed in at commandline.
+	switch *vtuberSoftware {
 	// PNGTuber Settings
 	case "Veadotube":
 		c.StreamTags = removeDuplicateStr(
@@ -499,14 +490,15 @@ func main() {
 		slog.SetDefault(slog.New(handler))
 	}
 
-	if !validVTuberSoftware[defaultVTuberSoftware] {
-		slog.Error("defaultVTuberSoftware is not a valid value. Fix it and recompile!")
-		os.Exit(1)
-	}
-
 	if *game == "" {
 		slog.Error("--game flag required.")
 		os.Exit(1)
+	}
+
+	// Sanity check the VTuber Software set.
+	if !validVTuberSoftware[*vtuberSoftware] {
+		slog.Debug("Invalid VTuberSoftware set. Using default: " + defaultVTuberSoftware + ".")
+		*vtuberSoftware = defaultVTuberSoftware
 	}
 
 	slog.Debug("Processing game " + *game + ".")
@@ -519,16 +511,16 @@ func main() {
 
 	// Grab base date items.
 	day := strconv.Itoa(time.Now().Day())
-	month := fmt.Sprintf(time.Now().Month().String())
+	month := fmt.Sprintf("%s", time.Now().Month().String())
 	year := strconv.Itoa(time.Now().Year())
 
 	// Build cobination date items.
-	date := fmt.Sprintf(month + "-" + day)
+	date := fmt.Sprintf("%s-%s", month, day)
 	if len(*dateOverride) > 0 {
 		date = *dateOverride
 	}
-	dateYear := fmt.Sprintf(date + "-" + year)
-	monthYear := fmt.Sprintf(month + "-" + year)
+	dateYear := fmt.Sprintf("%s-%s", date, year)
+	monthYear := fmt.Sprintf("%s-%s", month, year)
 
 	// Print everything for debugging.
 	slog.Debug("Today is " + weekday + "...")
@@ -553,8 +545,6 @@ func main() {
 	// Included/Nested configs will be recursed during each merge.
 	slog.Debug("Merging configs...")
 	twitchConfigs := newConfig()
-	// Set VTuberSoftware based on flag.
-	twitchConfigs.VTuberSoftware = *vtuberSoftware
 
 	// global
 	if globalConfig.GameFound {
