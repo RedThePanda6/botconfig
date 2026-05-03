@@ -115,6 +115,63 @@ type config struct {
 	YTGameInTitle     bool   `json:"ytgameintitle"`
 }
 
+// Date funcs
+func weekday() string {
+	w := time.Now().Weekday().String()
+
+	if len(*dayOverride) > 0 {
+		w = *dayOverride
+	}
+
+	slog.Debug("Today is " + w + "...")
+	return w
+}
+
+func day() string {
+	d := strconv.Itoa(time.Now().Day())
+
+	slog.Debug("Day is " + d + "...")
+	return d
+}
+
+func month() string {
+	m := time.Now().Month().String()
+
+	slog.Debug("Month is " + m + "...")
+	return m
+}
+
+func year() string {
+	y := strconv.Itoa(time.Now().Year())
+
+	slog.Debug("Year is " + y + "...")
+	return y
+}
+
+func date() string {
+	d := fmt.Sprintf("%s-%s", month(), day())
+	if len(*dateOverride) > 0 {
+		d = *dateOverride
+	}
+
+	slog.Debug("Date is " + d + "...")
+	return d
+}
+
+func dateYear() string {
+	dy := fmt.Sprintf("%s-%s", date(), year())
+
+	slog.Debug("Date w/Year is " + dy + "...")
+	return dy
+}
+
+func monthYear() string {
+	my := fmt.Sprintf("%s-%s", month(), year())
+
+	slog.Debug("Month w/Year is " + my + "...")
+	return my
+}
+
 func newConfig() *config {
 	// For setting non-standard default values.
 	return &config{
@@ -256,30 +313,16 @@ func (c *config) mergeConfigs(n config) {
 		"BambooSpecial",
 	}
 
-	// Pull all bools from config struct to resolve them.
-	boolsToResolve := []string{}
+	r := reflect.ValueOf(c).Elem()
 
-	r := reflect.ValueOf(c)
-
-	// Derefrence the pointer.
-	if r.Kind() == reflect.Ptr {
-		r = r.Elem()
-	}
-
-	for i := range r.NumField() {
-		if r.Field(i).Kind() == reflect.Bool {
-			fieldName := r.Type().Field(i).Name
-			if slices.Contains(boolsToNotResolve, fieldName) {
-				continue
+	for i := 0; i < r.NumField(); i++ {
+		fieldName := r.Type().Field(i).Name
+		if !(slices.Contains(boolsToNotResolve, fieldName)) {
+			field := r.Field(i)
+			if field.Kind() == reflect.Bool && field.CanSet() {
+				field.SetBool(resolveBool(*c, n, fieldName))
 			}
-			boolsToResolve = append(boolsToResolve, fieldName)
 		}
-	}
-
-	for _, f := range boolsToResolve {
-		reflect.ValueOf(c).Elem().FieldByName(f).SetBool(
-			resolveBool(*c, n, f),
-		)
 	}
 
 	// Outfit conflict resolution.
@@ -326,12 +369,12 @@ func (c *config) mergeConfigs(n config) {
 	// End Bamboo Request Cost
 }
 
-func (c *config) applyOverrides() {
+func (c *config) applyOverrides(vtuberSoftware string) {
 	// Values that don't need to be passed into StreamerBot.
 	c.Include = ""
 
 	// Apply overrides based on VTuberSoftware passed in at commandline.
-	switch *vtuberSoftware {
+	switch vtuberSoftware {
 	// PNGTuber Settings
 	case "Veadotube":
 		c.StreamTags = removeDuplicateStr(
@@ -397,6 +440,8 @@ func (c *config) applyOverrides() {
 }
 
 func sanitizeGame(s string) string {
+	slog.Debug("Processing game " + s + ".")
+
 	for _, c := range []string{
 		":", "&", "#", "\\", "/", "?", "@", "+", "|", "=", ",",
 	} {
@@ -432,12 +477,7 @@ func writeSchemaFile() {
 		}
 	}
 
-	r := reflect.ValueOf(config)
-
-	// Derefrence the pointer.
-	if r.Kind() == reflect.Ptr {
-		r = r.Elem()
-	}
+	r := reflect.ValueOf(config).Elem()
 
 	for i := range r.NumField() {
 		n := strings.ToLower(r.Type().Field(i).Name)
@@ -501,34 +541,6 @@ func main() {
 		*vtuberSoftware = defaultVTuberSoftware
 	}
 
-	slog.Debug("Processing game " + *game + ".")
-
-	weekday := time.Now().Weekday().String()
-	// Override day of week for testing.
-	if len(*dayOverride) > 0 {
-		weekday = *dayOverride
-	}
-
-	// Grab base date items.
-	day := strconv.Itoa(time.Now().Day())
-	month := fmt.Sprintf("%s", time.Now().Month().String())
-	year := strconv.Itoa(time.Now().Year())
-
-	// Build cobination date items.
-	date := fmt.Sprintf("%s-%s", month, day)
-	if len(*dateOverride) > 0 {
-		date = *dateOverride
-	}
-	dateYear := fmt.Sprintf("%s-%s", date, year)
-	monthYear := fmt.Sprintf("%s-%s", month, year)
-
-	// Print everything for debugging.
-	slog.Debug("Today is " + weekday + "...")
-	slog.Debug("Month is " + month + "...")
-	slog.Debug("Month w/Year is " + monthYear + "...")
-	slog.Debug("Date is " + date + "...")
-	slog.Debug("Date w/Year is " + dateYear + "...")
-
 	saneGame := sanitizeGame(*game)
 
 	// Set the names of the JSON files to merge.
@@ -565,11 +577,11 @@ func main() {
 
 	// And now we load all the day/date/whatever specific configs.
 	configFiles := []string{
-		fmt.Sprintf("%sday\\%s.json", *configRoot, weekday),
-		fmt.Sprintf("%smonth\\%s.json", *configRoot, month),
-		fmt.Sprintf("%smonth\\%s.json", *configRoot, monthYear),
-		fmt.Sprintf("%sdate\\%s.json", *configRoot, date),
-		fmt.Sprintf("%sdate\\%s.json", *configRoot, dateYear),
+		fmt.Sprintf("%sday\\%s.json", *configRoot, weekday()),
+		fmt.Sprintf("%smonth\\%s.json", *configRoot, month()),
+		fmt.Sprintf("%smonth\\%s.json", *configRoot, monthYear()),
+		fmt.Sprintf("%sdate\\%s.json", *configRoot, date()),
+		fmt.Sprintf("%sdate\\%s.json", *configRoot, dateYear()),
 	}
 
 	for _, file := range configFiles {
@@ -581,7 +593,7 @@ func main() {
 	}
 
 	// Apply overrides.
-	twitchConfigs.applyOverrides()
+	twitchConfigs.applyOverrides(*vtuberSoftware)
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
