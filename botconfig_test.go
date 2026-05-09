@@ -11,12 +11,33 @@ import (
 )
 
 func TestDayOfWeek(t *testing.T) {
+	// Yes I acknowledge that this really should be using some form on controlled
+	// or mocked time but this is good enough beacuse I doubt I'd ever be testing
+	// this exactly as a day rolls over.
 	want := time.Now().Weekday().String()
 
 	got := weekday()
 
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("weekday() mismatch (-want +got):\n%s", diff)
+	}
+}
+
+func TestMonthYear(t *testing.T) {
+	// Yes I acknowledge that this really should be using some form on controlled
+	// or mocked time but this is good enough beacuse I doubt I'd ever be testing
+	// this exactly as a day rolls over.
+	now := time.Now()
+	want := fmt.Sprintf(
+		"%s-%s",
+		now.Month().String(),
+		strconv.Itoa(now.Year()),
+	)
+
+	got := monthYear()
+
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("monthYear() mismatch (-want +got):\n%s", diff)
 	}
 }
 
@@ -50,9 +71,6 @@ func TestStringDeduplication(t *testing.T) {
 }
 
 func TestApplyOverrides(t *testing.T) {
-	// Silly hack because this was getting set to true while running mergeConfig tests.
-	bambooSpecialPresent = false
-
 	vnyan := *newConfig()
 	vnyan.StreamTags = []string{"VTuber", "RedPanda", "Furry", "ENVTuber"}
 
@@ -98,10 +116,12 @@ func TestApplyOverrides(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.config.applyOverrides(tt.softare)
-			if diff := cmp.Diff(tt.want, tt.config, cmpopts.EquateEmpty()); diff != "" {
+	for _, tc := range tests {
+		// Silly hack because this was getting set to true while running mergeConfig tests.
+		bambooSpecialPresent = false
+		t.Run(tc.name, func(t *testing.T) {
+			tc.config.applyOverrides(tc.softare, "")
+			if diff := cmp.Diff(tc.want, tc.config, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("applyOverrides() mismatch (-want +got):\n%s", diff)
 			}
 		})
@@ -150,6 +170,12 @@ func TestMergeConfigs(t *testing.T) {
 			easyBoolMerge,
 		},
 		{
+			"Easy Bool Merges Inverse",
+			easyBoolMerge,
+			*newConfig(),
+			easyBoolMerge,
+		},
+		{
 			"Merge Multiple Suffixes",
 			suffixA,
 			suffixB,
@@ -159,6 +185,12 @@ func TestMergeConfigs(t *testing.T) {
 			"Custom End Hour + Minute",
 			*newConfig(),
 			endHourMinute,
+			endHourMinute,
+		},
+		{
+			"Custom End Hour + Minute Inverse",
+			endHourMinute,
+			*newConfig(),
 			endHourMinute,
 		},
 		{
@@ -173,14 +205,42 @@ func TestMergeConfigs(t *testing.T) {
 			lpCostOverride,
 			lpCostOverride,
 		},
+		{
+			"LP Cost Inverse",
+			lpCostOverride,
+			*newConfig(),
+			lpCostOverride,
+		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tt.config.mergeConfigs(tt.new)
-			if diff := cmp.Diff(tt.want, tt.config, cmpopts.EquateEmpty()); diff != "" {
+	for _, tc := range tests {
+		// Silly hack because this was getting set to true while running mergeConfig tests.
+		bambooSpecialPresent = false
+		t.Run(tc.name, func(t *testing.T) {
+			tc.config.mergeConfigs(tc.new)
+			if diff := cmp.Diff(tc.want, tc.config, cmpopts.EquateEmpty()); diff != "" {
 				t.Errorf("mergConfigs() mismatch (-want +got):\n%s", diff)
 			}
 		})
+	}
+}
+
+func TestTestGame(t *testing.T) {
+	// Attempting (poorly) to simulate an end-to-end run and compare against a
+	// known good file. The file will need updated from time to time.
+	gameName := "Test"
+	c := newConfig()
+	c.SanitizedGameName = sanitizeGame(gameName)
+	global := readFromFile("G:\\My Drive\\Streaming\\Chatbot\\twitch_configs\\global.json")
+	g := readFromFile("G:\\My Drive\\Streaming\\Chatbot\\twitch_configs\\games\\Test.json")
+
+	want := readFromFile("C:\\Users\\mbern\\go\\src\\botconfig\\TestOutput.json")
+
+	c.mergeConfigs(*global)
+	c.mergeConfigs(*g)
+	c.applyOverrides("VNyan", gameName)
+
+	if diff := cmp.Diff(want, c); diff != "" {
+		t.Errorf("config mismatch (-want +got):\n%s", diff)
 	}
 }
