@@ -369,7 +369,7 @@ func (c *config) mergeConfigs(n config) {
 	// End Bamboo Request Cost
 }
 
-func (c *config) applyOverrides(vtuberSoftware string) {
+func (c *config) applyOverrides(vtuberSoftware string, game string) {
 	// Values that don't need to be passed into StreamerBot.
 	c.Include = ""
 
@@ -426,7 +426,7 @@ func (c *config) applyOverrides(vtuberSoftware string) {
 	}
 
 	// Set GameName to passed in value.
-	c.GameName = *game
+	c.GameName = game
 
 	// Silly hack in order to correctly pass back if we're running a special on
 	// BambooRequestCost.
@@ -593,7 +593,7 @@ func main() {
 	}
 
 	// Apply overrides.
-	twitchConfigs.applyOverrides(*vtuberSoftware)
+	twitchConfigs.applyOverrides(*vtuberSoftware, *game)
 
 	// Things we need to set after all is said and done.
 	// Typically things we can't do in the applyOverrides scope.
