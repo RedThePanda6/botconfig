@@ -72,9 +72,10 @@ type config struct {
 	// Includes
 	Include string `json:"include"`
 	// Stream Settings
-	LivePostBluesky string   `json:"livepostbluesky"`
-	StreamTags      []string `json:"streamtags"`
-	TitleSuffix     string   `json:"titlesuffix"`
+	BSkyImagePath string   `json:"bskyimagepath"`
+	BSkyLivePost  string   `json:"bskylivepost"`
+	StreamTags    []string `json:"streamtags"`
+	TitleSuffix   string   `json:"titlesuffix"`
 	// Model Options
 	VNyanOutfit string `json:"vnyanoutfit"`
 	// Overlays
@@ -288,8 +289,12 @@ func (c *config) mergeConfigs(n config) {
 		}
 	}
 
-	if n.LivePostBluesky != "" {
-		c.LivePostBluesky = n.LivePostBluesky
+	if n.BSkyLivePost != "" {
+		c.BSkyLivePost = n.BSkyLivePost
+	}
+
+	if n.BSkyImagePath != "" {
+		c.BSkyImagePath = n.BSkyImagePath
 	}
 
 	if n.NotifyInterval < c.NotifyInterval {
